@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.8.15';
+  const VERSION = '0.8.16';
   let panel;
   let refreshTimer;
   let tasks = [];

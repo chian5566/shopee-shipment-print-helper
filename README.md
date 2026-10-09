@@ -8,7 +8,7 @@ Chrome 擴充功能，協助蝦皮台灣賣家在批次出貨頁下載並整理�
 
 ## 安裝
 
-1. 到本專案的 **Releases** 下載 `shopee-shipment-print-helper-0.8.15.zip`。
+1. 到本專案的 **Releases** 下載 `shopee-shipment-print-helper-0.8.16.zip`。
 2. 解壓縮到一個固定資料夾，安裝後保留該資料夾。
 3. 在 Chrome 開啟 `chrome://extensions/`，開啟「開發人員模式」。
 4. 按「載入未封裝項目」，選擇含有 `manifest.json` 的資料夾。
