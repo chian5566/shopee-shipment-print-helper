@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "LEISURE HOMME 出貨印單助手",
+  "description": "在蝦皮批次出貨頁整理已選訂單，下載原生寄件單並列印 100 x 150 mm 裝箱單。",
+  "version": "0.8.13",
+  "action": {
+    "default_title": "開啟 LEISURE HOMME 出貨印單助手",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "permissions": [
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://seller.shopee.tw/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vendor/NotoSansTC.ttf",
+        "vendor/pdf.min.mjs",
+        "vendor/pdf.worker.min.mjs"
+      ],
+      "matches": [
+        "https://seller.shopee.tw/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://seller.shopee.tw/awbprint*"
+      ],
+      "js": [
+        "preview-reader.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://seller.shopee.tw/portal/sale/mass/ship*"
+      ],
+      "js": [
+        "network-hook.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://seller.shopee.tw/portal/sale/mass/ship*"
+      ],
+      "js": [
+        "vendor/fontkit.umd.min.js",
+        "vendor/pdf-lib.min.js",
+        "print-layout.js",
+        "packing-slip.js",
+        "content.js"
+      ],
+      "css": [
+        "panel.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
