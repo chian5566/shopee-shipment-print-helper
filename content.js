@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.8.14';
+  const VERSION = '0.8.15';
   let panel;
   let refreshTimer;
   let tasks = [];
@@ -94,6 +94,7 @@
     return candidates.find(input=>input.checked) || candidates[0];
   }
 
+  const DOWNLOAD_PAGE_URL = 'https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301';
   const PAGE_HINT = '請前往蝦皮「批次出貨 → 下載出貨文件」頁面使用出貨助手。';
   function isDownloadPage() {
     if (!/^\/portal\/sale\/mass\/ship(?:\/|$)/.test(location.pathname)) return false;
@@ -118,6 +119,9 @@
     if (!hint) return;
     const mode=assistantMode();
     hint.textContent=mode.hint;
+    if (mode.hint===PAGE_HINT) {
+      hint.innerHTML=`請前往蝦皮「<a href="${DOWNLOAD_PAGE_URL}" style="color:inherit;text-decoration:underline">批次出貨 → 下載出貨文件</a>」頁面使用出貨助手。`;
+    }
     hint.hidden=mode.enabled;
     hint.style?.setProperty('display',mode.enabled?'none':'block','important');
   }

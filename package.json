@@ -1,6 +1,6 @@
 {
   "name": "shopee-shipment-print-helper",
-  "version": "0.8.14",
+  "version": "0.8.15",
   "private": true,
   "description": "Local Shopee Taiwan shipping label and packing slip print helper",
   "engines": {

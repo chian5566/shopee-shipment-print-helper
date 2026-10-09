@@ -29,6 +29,27 @@ function currentTask(sender) {
   if (url)task.previews.set(tab.id,url.href);
   return task;
 }
+const DOWNLOAD_PAGE_URL=SOURCE+'?mass_shipment_tab=301';
+chrome.action.onClicked.addListener(async tab=>{
+  let sellerPage=false;
+  try { sellerPage=new URL(tab.url).origin==='https://seller.shopee.tw'; } catch (_) {}
+  if (!tab.id || !sellerPage) {
+    chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});return;
+  }
+  try {
+    await chrome.tabs.sendMessage(tab.id,{type:'OPEN_PANEL'});
+  } catch (_) {
+    try {
+      // Recover old tabs without showing an extra menu or refreshing Shopee.
+      await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',files:['network-hook.js']});
+      await chrome.scripting.insertCSS({target:{tabId:tab.id},files:['panel.css']});
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','print-layout.js','packing-slip.js','content.js']});
+      await chrome.tabs.sendMessage(tab.id,{type:'OPEN_PANEL'});
+    } catch (_) {
+      chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});
+    }
+  }
+});
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW'].includes(message.type)) {
     if (!sourceTab(sender)) {sendResponse({ok:false});return;}
