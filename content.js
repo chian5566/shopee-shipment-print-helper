@@ -1,6 +1,8 @@
 (() => {
+  if (window.__lhShipmentAssistantLoaded) return;
+  window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.8.13';
+  const VERSION = '0.8.14';
   let panel;
   let refreshTimer;
   let tasks = [];
@@ -92,7 +94,19 @@
     return candidates.find(input=>input.checked) || candidates[0];
   }
 
+  const PAGE_HINT = '請前往蝦皮「批次出貨 → 下載出貨文件」頁面使用出貨助手。';
+  function isDownloadPage() {
+    if (!/^\/portal\/sale\/mass\/ship(?:\/|$)/.test(location.pathname)) return false;
+    // The route also contains earlier shipping steps; require mounted download controls.
+    return Boolean(documentCheckbox('寄件單') && documentCheckbox('裝箱單')) ||
+      [...document.querySelectorAll('button, [role="button"]')].some(button =>
+        !button.closest?.('#lh-shipment-panel') &&
+        (!button.getClientRects || button.getClientRects().length > 0) &&
+        clean(button.textContent).replace(/\s/g, '').includes('下載所選文件'));
+  }
+
   function assistantMode() {
+    if (!isDownloadPage()) return {enabled:false,hint:PAGE_HINT};
     if (!documentCheckbox('寄件單')?.checked || !documentCheckbox('裝箱單')?.checked) {
       return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
     }
@@ -102,13 +116,14 @@
   function renderMode() {
     const hint=panel?.isConnected && panel.querySelector('.lh-mode-hint');
     if (!hint) return;
-    const bothSelected=Boolean(documentCheckbox('寄件單')?.checked && documentCheckbox('裝箱單')?.checked);
-    hint.textContent=bothSelected?'':'請同時勾選寄件單和裝箱單後才可使用';
-    hint.hidden=bothSelected;
-    hint.style?.setProperty('display',bothSelected?'none':'block','important');
+    const mode=assistantMode();
+    hint.textContent=mode.hint;
+    hint.hidden=mode.enabled;
+    hint.style?.setProperty('display',mode.enabled?'none':'block','important');
   }
 
   function handleNativeDownload(event) {
+    if (!isDownloadPage()) return;
     const native=event.target?.closest?.('button, [role="button"]');
     if(!native || native.disabled || !clean(native.textContent).replace(/\s/g,'').includes('下載所選文件'))return;
     if (activeTask && !activeTask.combinedUrl && !activeTask.failed) {
@@ -253,10 +268,11 @@
     renderMode();
     // 蝦皮以 Vue 動態更新勾選狀態；輪詢只更新本機面板，不讀取或傳送資料。
     window.clearInterval(refreshTimer);
-    refreshTimer = window.setInterval(renderOrders, 500);
+    refreshTimer = window.setInterval(() => { renderOrders(); renderMode(); }, 500);
   }
 
   function configureShopeeDefaults() {
+    if (!isDownloadPage()) { renderMode(); return; }
     const header = document.querySelector('.mass-ship-header input[type="checkbox"]');
     // Select all only on initial setup. A later manual deselection must stay deselected.
     if (!defaultsApplied && header && !header.disabled) {
@@ -279,6 +295,14 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.type === 'GET_PAGE_STATUS') {
+      sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
+    }
+    if (message.type === 'OPEN_PANEL') {
+      if (!document.getElementById(PANEL_ID)) makePanel();
+      else renderMode();
+      sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
+    }
     if (message.type === 'PREVIEW_PDF') {
       const task = activeTask; if (!task || task.cancelled || task.failed || task.combinedUrl || message.taskId !== task.id) return;
       try {

@@ -1,4 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
+const location={pathname:'/portal/sale/mass/ship'};
 const intervals=[],timeouts=[],events={},sent=[];let selected=false,runtimeListener,panel;const duplicates=[];
 function control(type,value,checked=false){return {type,value,checked,disabled:false,clicks:0,click(){this.clicks++;this.checked=type==='radio'?true:!this.checked;if(this===header)selected=this.checked;},closest(selector){return selector==='label'?{innerText:value,parentElement:{innerText:value}}:null;}};}
 const header=control('checkbox','all'),label=control('checkbox','寄件單'),packing=control('checkbox','裝箱單'),picklist=control('checkbox','撿貨單'),packingPdf=control('radio','PACKING_LIST_PDF');let thermal=control('radio','C2C_SHIPPING_LABEL_THERMAL');
@@ -11,7 +12,7 @@ const document={addEventListener:(type,fn)=>events[type]=fn,createElement:()=>pa
 const windowEvents={};
 const window={dispatchEvent(){resizes++;},addEventListener(type,fn){windowEvents[type]=fn;},setInterval(fn,delay){intervals.push({fn,delay});},setTimeout(fn,delay){timeouts.push({fn,delay});},clearTimeout(){},clearInterval(){}};
 const chrome={runtime:{onMessage:{addListener(fn){runtimeListener=fn;}},sendMessage(message){sent.push(message);}}};
-vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8'),{window,document,chrome,console,atob,URL,Event});
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8'),{window,document,chrome,console,atob,URL,Event,location});
 const tick=intervals.find(i=>i.delay===250).fn;
 tick();assert.ok(selected);assert.ok(!label.checked&&!packing.checked&&!picklist.checked);assert.equal(label.clicks+packing.clicks+picklist.clicks,0);
 runtimeListener({type:'TOGGLE_PANEL'});assert.ok(panel.isConnected);assert.ok(!panel.querySelector('.lh-mode-hint').hidden);assert.equal(label.clicks+packing.clicks,0);
@@ -72,3 +73,19 @@ assert.ok(pushed);const resizeBefore=resizes;
 runtimeListener({type:'TOGGLE_PANEL'});assert.equal(pushed,false);assert.equal(resizes,resizeBefore+1);
 runtimeListener({type:'TOGGLE_PANEL'});assert.equal(pushed,true);assert.equal(resizes,resizeBefore+2);
 panel.querySelector('.lh-close').onclick();assert.equal(pushed,false);
+
+// The panel always opens off-route and recovers when SPA navigation returns.
+location.pathname='/portal/home';
+let reply;runtimeListener({type:'OPEN_PANEL'},null,value=>reply=value);
+assert.ok(panel.isConnected);assert.equal(reply.downloadPage,false);
+assert.match(panel.querySelector('.lh-mode-hint').textContent,/批次出貨 → 下載出貨文件/);
+sent.length=0;native.click();assert.equal(sent.length,0);
+location.pathname='/portal/sale/mass/ship';tick();
+assert.equal(panel.querySelector('.lh-mode-hint').hidden,true);
+runtimeListener({type:'GET_PAGE_STATUS'},null,value=>reply=value);assert.equal(reply.downloadPage,true);
+// Earlier steps on the same route have no document controls.
+const originalQueries=document.querySelectorAll;
+document.querySelectorAll=selector=>selector==='input[type="checkbox"]'?[]:originalQueries(selector);
+runtimeListener({type:'GET_PAGE_STATUS'},null,value=>reply=value);assert.equal(reply.downloadPage,false);
+tick();assert.match(panel.querySelector('.lh-mode-hint').textContent,/批次出貨 → 下載出貨文件/);
+console.log('PASS: off-page open, page hint, SPA recovery, earlier shipping step');

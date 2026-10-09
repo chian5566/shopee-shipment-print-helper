@@ -1,4 +1,6 @@
 (() => {
+  if (window.__lhShipmentNetworkHookLoaded) return;
+  window.__lhShipmentNetworkHookLoaded = true;
   const jobTasks=new Map();
   function jobs(value,depth=0) {
     if(!value || typeof value!=='object' || depth>6)return [];

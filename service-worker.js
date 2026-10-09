@@ -29,10 +29,6 @@ function currentTask(sender) {
   if (url)task.previews.set(tab.id,url.href);
   return task;
 }
-chrome.action.onClicked.addListener(async tab=>{
-  if (!tab.id || !tab.url?.startsWith(SOURCE)) return;
-  try {await chrome.tabs.sendMessage(tab.id,{type:'TOGGLE_PANEL'});}catch (_) {}
-});
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW'].includes(message.type)) {
     if (!sourceTab(sender)) {sendResponse({ok:false});return;}

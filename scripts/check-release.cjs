@@ -1,12 +1,13 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),manifest=require('../manifest.json');
 assert.equal(manifest.version,require('../package.json').version);
-assert.deepEqual(manifest.permissions,['tabs']);
+assert.deepEqual(manifest.permissions,['tabs','scripting']);
 assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*']);
 assert.equal(require('../package.json').license,'SEE LICENSE IN LICENSE.md');
 const required=new Set([...Object.values(manifest.icons),'LICENSE.md']);
 for(const script of manifest.content_scripts)for(const file of [...(script.js||[]),...(script.css||[])])required.add(file);
 required.add(manifest.background.service_worker);
+for(const file of [manifest.action.default_popup,'popup.js','popup.css'])required.add(file);
 for(const rule of manifest.web_accessible_resources)for(const file of rule.resources)required.add(file);
 for(const file of required)assert.ok(fs.existsSync(path.join(root,file)),`Missing: ${file}`);
 const forbidden=/(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\/Users\/|ArialUnicode|HiraginoSansGB|TW(?!0{12})\d{10,})/;

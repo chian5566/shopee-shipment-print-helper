@@ -2,6 +2,6 @@ const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('no
 const root=path.resolve(__dirname,'..');require('./check-release.cjs');
 const version=require('../manifest.json').version;fs.mkdirSync(path.join(root,'dist'),{recursive:true});
 const target=path.join(root,'dist',`shopee-shipment-print-helper-${version}.zip`);
-const files=['manifest.json','content.js','network-hook.js','service-worker.js','preview-reader.js','packing-slip.js','print-layout.js','panel.css','icons','vendor','README.md','LICENSE.md','PRIVACY.md','THIRD_PARTY.md'];
+const files=['manifest.json','popup.html','popup.css','popup.js','content.js','network-hook.js','service-worker.js','preview-reader.js','packing-slip.js','print-layout.js','panel.css','icons','vendor','README.md','LICENSE.md','PRIVACY.md','THIRD_PARTY.md'];
 if(fs.existsSync(target))fs.unlinkSync(target);
 execFileSync('zip',['-qr',target,...files],{cwd:root});console.log(target);
