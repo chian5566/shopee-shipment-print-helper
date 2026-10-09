@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.8.16';
+  const VERSION = '0.8.17';
   let panel;
   let refreshTimer;
   let tasks = [];
@@ -106,11 +106,21 @@
         clean(button.textContent).replace(/\s/g, '').includes('下載所選文件'));
   }
 
+  const THERMAL_HINT = '助手目前僅支援熱感列印，請將寄件單切換為熱感列印。一般列印仍可使用蝦皮原生下載。';
+  function thermalLabelSelected() {
+    return [...document.querySelectorAll('input[type="radio"][value="C2C_SHIPPING_LABEL_THERMAL"]')].some(input => {
+      const wrapper=input.closest?.('label') || input;
+      const visible=!wrapper.getClientRects || wrapper.getClientRects().length>0;
+      return visible && input.checked && !input.disabled;
+    });
+  }
+
   function assistantMode() {
     if (!isDownloadPage()) return {enabled:false,hint:PAGE_HINT};
     if (!documentCheckbox('寄件單')?.checked || !documentCheckbox('裝箱單')?.checked) {
       return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
     }
+    if (!thermalLabelSelected()) return {enabled:false,hint:THERMAL_HINT};
     return {enabled:true,hint:''};
   }
 
@@ -137,7 +147,11 @@
     document.documentElement.removeAttribute('data-lh-background-task');
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK'});
     renderMode();renderTasks();
-    if(!assistantMode().enabled)return;
+    const mode=assistantMode();
+    if (!mode.enabled) {
+      if (mode.hint===THERMAL_HINT && !panel?.isConnected) makePanel();
+      return;
+    }
     const orders=selectedOrders();
     if(!panel?.isConnected)makePanel();
     if(!orders.length) {
