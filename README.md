@@ -6,7 +6,7 @@
 
 ## 安裝
 
-1. 到 [下載頁面](https://github.com/chian5566/shopee-shipment-print-helper/releases) 下載 ZIP，並解壓縮。
+1. 在本專案頁面點選 **Code → Download ZIP**，下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
