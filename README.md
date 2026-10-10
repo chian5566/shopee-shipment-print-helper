@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.9.0**。新增功能與修正請見 [更新紀錄](CHANGELOG.md)。
+目前版本：**v0.9.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 安裝
 
@@ -17,7 +17,7 @@
 
 ## 使用
 
-1. 前往蝦皮 [批次出貨 → 下載出貨文件](https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301)。
+1. 前往蝦皮 <a href="https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301" target="_blank" rel="noopener noreferrer">批次出貨 → 下載出貨文件</a>。
 2. 點「印」字圖示開啟助手，確認要出貨的訂單（助手會先選取目前頁面的訂單）。
 3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」。
 4. 按蝦皮的「下載所選文件」。
@@ -29,7 +29,7 @@
 
 ## 問題或建議
 
-[填寫回報表單](https://forms.gle/dWHwKoQnWCdBVqPn7)，簡單說明操作步驟即可，也可選填圖片或影片（最多 5 個，每個 100 MB）。
+<a href="https://forms.gle/dWHwKoQnWCdBVqPn7" target="_blank" rel="noopener noreferrer">填寫回報表單</a>，簡單說明操作步驟即可，也可選填圖片或影片（最多 5 個，每個 100 MB）。
 
 表單須登入 Google；上傳並提交附件時，Google 會記錄帳戶名稱、信箱與相片。截圖、影片請先遮住買家姓名、電話、地址等個資。
 
@@ -39,8 +39,8 @@
 
 出貨資料在你的電腦處理，助手不會自動上傳。這是獨立製作的工具，與蝦皮官方無關。
 
-可免費用於自己的賣場，不可轉售或另行散布。詳見 [使用條款](LICENSE.md) 與 [隱私說明](PRIVACY.md)。
+可免費用於自己的賣場，不可轉售或另行散布。詳見 <a href="LICENSE.md" target="_blank" rel="noopener noreferrer">使用條款</a> 與 <a href="PRIVACY.md" target="_blank" rel="noopener noreferrer">隱私說明</a>。
 
 ## 支持作者
 
-此工具由 [@chian5566](https://www.threads.com/@chian5566) 無償提供，若您覺得不錯想支持我，歡迎到 [LEISURE HOMME](https://shopee.tw/shop/1853603/) 跟我買件衣服！我就會很開心了！
+此工具由 <a href="https://www.threads.com/@chian5566" target="_blank" rel="noopener noreferrer">@chian5566</a> 無償提供，若您覺得不錯想支持我，歡迎到 <a href="https://shopee.tw/shop/1853603/" target="_blank" rel="noopener noreferrer">LEISURE HOMME</a> 跟我買件衣服！我就會很開心了！
