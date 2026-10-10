@@ -41,4 +41,6 @@
 
 可免費用於自己的賣場，不可轉售或另行散布。詳見 [使用條款](LICENSE.md) 與 [隱私說明](PRIVACY.md)。
 
-本功能由 [@chian5566](https://www.threads.com/@chian5566) 無償提供，若您覺得不錯想支持我，歡迎到 [LEISURE HOMME](https://shopee.tw/shop/1853603/) 跟我買件衣服！我就會很開心了！
+## 支持作者
+
+此工具由 [@chian5566](https://www.threads.com/@chian5566) 無償提供，若您覺得不錯想支持我，歡迎到 [LEISURE HOMME](https://shopee.tw/shop/1853603/) 跟我買件衣服！我就會很開心了！
