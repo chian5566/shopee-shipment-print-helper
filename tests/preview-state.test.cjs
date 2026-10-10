@@ -1,0 +1,20 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8');
+const functions=source.slice(source.indexOf('  function markTaskReady('),source.indexOf('  async function mergeNativeDocuments'));
+let now=Date.parse('2026-10-10T04:00:00Z'),opened=true;const timers=[],opens=[];
+const tasks=[{name:'寄件單＋裝箱單',startedAt:now-1000,combinedUrl:'blob:test',progress:65},{name:'另一批文件',startedAt:now,progress:10}];
+let buttons=[];const slot={innerHTML:'',querySelectorAll(){buttons=[...this.innerHTML.matchAll(/data-task="(\d+)"/g)].map(m=>({dataset:{task:m[1]}}));return buttons;}};
+const clear={};const panel={isConnected:true,querySelector:s=>s==='.lh-tasks'?slot:clear};
+class TestDate extends Date {static now(){return now;}}
+const context={panel,tasks,Date:TestDate,escapeHtml:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'),window:{setTimeout(fn,delay){timers.push({fn,delay});},open(url,target){opens.push({url,target});return opened?{}:null;}}};
+vm.createContext(context);vm.runInContext(functions+'\nglobalThis.api={markTaskReady,previewTask,renderTasks};',context);
+context.api.markTaskReady(tasks[0]);
+assert.match(slot.innerHTML,/預覽文件/);assert.doesNotMatch(slot.innerHTML,/>列印<|上次預覽/);assert.match(slot.innerHTML,/尚未預覽|lh-task-unviewed/);assert.match(slot.innerHTML,/lh-ready-flash/);assert.equal(timers[0].delay,2400);
+now+=1000;context.api.renderTasks();assert.match(slot.innerHTML,/--lh-ready-delay:-1000ms/);
+opened=false;buttons[0].onclick();assert.equal(tasks[0].lastPreviewAt,undefined);assert.match(slot.innerHTML,/預覽視窗未開啟/);assert.doesNotMatch(slot.innerHTML,/上次預覽/);
+opened=true;buttons[0].onclick();assert.equal(tasks[0].lastPreviewAt,now);assert.match(slot.innerHTML,/已預覽|lh-task-viewed|再次預覽文件/);assert.match(slot.innerHTML,/上次預覽：2026-10-10 12:00:01/);assert.doesNotMatch(slot.innerHTML,/lh-ready-flash|預覽視窗未開啟/);assert.equal(tasks[1].lastPreviewAt,undefined);
+now+=5000;buttons[0].onclick();assert.match(slot.innerHTML,/上次預覽：2026-10-10 12:00:06/);assert.equal(opens.at(-1).url,'blob:test');
+const count=opens.length;tasks[0].cancelled=true;context.api.previewTask(tasks[0]);assert.equal(opens.length,count);
+context.api.markTaskReady({...tasks[1],combinedUrl:'blob:other'});now+=2400;timers.at(-1).fn();assert.doesNotMatch(slot.innerHTML,/lh-ready-flash/);
+const css=fs.readFileSync(path.resolve(__dirname,'../panel.css'),'utf8');assert.match(css,/prefers-reduced-motion:reduce/);
+console.log('PASS: ready animation, stable timing, unviewed/viewed distinction, successful/blocked previews, Taiwan last-preview time, repeat timestamp, per-task state and cancellation');

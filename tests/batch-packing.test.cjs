@@ -4,7 +4,7 @@ const packing=pages.flatMap(slip.extractPackingSections);
 assert.deepEqual(packing.map(p=>p.orderId),['250101TEST0006','250101TEST0005','250101TEST0004','250101TEST0003']);
 assert.deepEqual(packing.map(p=>p.rows.length),[3,1,2,2]);
 assert.ok(packing.every(p=>p.buyerNote===''));
-assert.deepEqual(packing[0].rows[1],{sku:'PT11',spec:'藏青色 / L',qty:1});
+assert.deepEqual(packing[0].rows[1],{sku:'PT11',variantSku:'PT11_NVY_L',name:'【 LEISURE 】現貨純棉斜紋布寬褲腰頭打摺縮口褲管素色休閒長褲韓系寬鬆褲垂墜感日常通勤棉褲 PT11',spec:'藏青色 / L',qty:1});
 const top=pages[0].filter(i=>i.transform[5]>500);
 assert.deepEqual(slip.extractPackingSections(top),[packing[0]]);
 assert.throws(()=>slip.extractPackingSections(top.filter(i=>i.str!=='PT11_NVY_L')),/第 2 列.*不完整/);

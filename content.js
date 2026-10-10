@@ -2,13 +2,23 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.8.17';
+  const VERSION = '0.9.0';
   let panel;
   let refreshTimer;
   let tasks = [];
   let defaultsApplied = false;
   let activeTask = null;
   let configuredFormats = new WeakSet();
+  let chineseFontBytesPromise;
+  async function loadChineseFontBytes() {
+    if (!chineseFontBytesPromise) {
+      chineseFontBytesPromise=fetch(chrome.runtime.getURL('vendor/NotoSansTC.ttf')).then(response=>{
+        if (!response.ok) throw new Error('中文字型載入失敗');
+        return response.arrayBuffer();
+      }).catch(error=>{chineseFontBytesPromise=null;throw error;});
+    }
+    return chineseFontBytesPromise;
+  }
   function findJobId(value, depth = 0) {
     if (!value || depth > 6) return null;
     if (typeof value === 'object') {
@@ -63,12 +73,21 @@
     if (!panel?.isConnected) return [];
     const orders = selectedOrders();
     const list = panel.querySelector('.lh-orders');
-    panel.querySelector('.lh-count').textContent = orders.length;
-    list.innerHTML = orders.length ? orders.map((order) => {
-      const parts = (order.summary || '').split(' '); const buyer = parts[0] || '-'; const tracking = parts.find((part) => /^TW[A-Z0-9]+$/i.test(part)) || '-'; const time = parts.slice(-2).join(' ') || '-';
-      return `<div class="lh-order"><strong>${escapeHtml(order.orderId)}</strong><div class="lh-order-meta"><span>買家 ${escapeHtml(buyer)}</span><span>追蹤 ${escapeHtml(tracking)}</span><span>${escapeHtml(time)}</span></div></div>`;
+    const count=panel.querySelector('.lh-count');
+    const countText=`已選 ${orders.length} 個訂單`;
+    if (count.textContent!==countText) count.textContent=countText;
+    const markup = orders.length ? orders.map((order) => {
+      const summary=order.summary || '';
+      const buyer=summary.split(' ')[0] || '—';
+      const time=summary.match(/(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?/g)?.at(-1) || '—';
+      return `<div class="lh-order"><div class="lh-order-id"><span>訂單編號</span><strong>${escapeHtml(order.orderId)}</strong></div><dl class="lh-order-meta"><dt>買家</dt><dd>${escapeHtml(buyer)}</dd><dt>時間</dt><dd>${escapeHtml(time)}</dd></dl></div>`;
     }).join('') :
       '<div class="lh-order lh-muted">尚未選取訂單</div>';
+    // Preserve the actual DOM nodes and text selection on unchanged poll ticks.
+    // Cache authored markup: browser serialization can normalize escaped names.
+    if (list.__lhOrdersMarkup!==markup) {
+      list.innerHTML=markup;list.__lhOrdersMarkup=markup;
+    }
     return orders;
   }
 
@@ -169,7 +188,7 @@
 
   function failTask(task,detail) {
     task.failed=true;task.progress=0;task.detail=detail;
-    for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer])window.clearTimeout(timer);
+    for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer,task.readyTimer])window.clearTimeout(timer);
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
     if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');}
     renderTasks();
@@ -182,7 +201,7 @@
 
   function cancelTask(task) {
     task.cancelled=true;task.progress=0;task.detail='任務已取消';
-    for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer]) window.clearTimeout(timer);
+    for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer,task.readyTimer]) window.clearTimeout(timer);
     releaseTaskFiles(task);
   }
 
@@ -194,6 +213,21 @@
     renderTasks();
   }
 
+  function markTaskReady(task) {
+    task.progress=100;task.detail='文件已完成，可預覽';task.readyAt=Date.now();
+    renderTasks();
+    task.readyTimer=window.setTimeout(()=>{if(!task.cancelled)renderTasks();},2400);
+  }
+
+  function previewTask(task) {
+    if (!task?.combinedUrl || task.cancelled || task.failed) return;
+    const preview=window.open(task.combinedUrl,'_blank');
+    if (!preview) {
+      task.previewError='預覽視窗未開啟，請允許彈出視窗後重試。';renderTasks();return;
+    }
+    task.lastPreviewAt=Date.now();task.previewError='';renderTasks();
+  }
+
   function renderTasks() {
     const slot = panel?.isConnected && panel.querySelector('.lh-tasks');
     if (!slot) return;
@@ -202,9 +236,15 @@
       const started=new Date(task.startedAt);
       const time=started.toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hourCycle:'h23'});
       const progress=task.cancelled || task.failed ? '' : `<div class="lh-progress"><i style="width:${task.progress || 0}%"></i></div>`;
-      return `<div class="lh-task"><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><span>${escapeHtml(task.detail)}</span>${progress}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">列印</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
+      const readyAge=task.readyAt ? Date.now()-task.readyAt : 2400;
+      const flashing=task.combinedUrl && readyAge>=0 && readyAge<2400 && !task.lastPreviewAt;
+      const stateClass=task.combinedUrl ? (task.lastPreviewAt ? ' lh-task-viewed' : ' lh-task-unviewed') : '';
+      const animation=flashing ? ` style="--lh-ready-delay:-${readyAge}ms"` : '';
+      const previewTime=task.lastPreviewAt ? new Date(task.lastPreviewAt) : null;
+      const previewStatus=task.combinedUrl ? `<span class="lh-preview-state">${previewTime ? '已預覽' : '尚未預覽'}</span>${previewTime ? `<time class="lh-task-time" datetime="${previewTime.toISOString()}">上次預覽：${escapeHtml(previewTime.toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hourCycle:'h23'}))}</time>` : ''}` : '';
+      return `<div class="lh-task${stateClass}${flashing ? ' lh-ready-flash' : ''}"${animation}><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><span>${escapeHtml(task.detail)}</span>${progress}${previewStatus}${task.previewError ? `<span class="lh-preview-error">${escapeHtml(task.previewError)}</span>` : ''}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">'+(previewTime ? '再次預覽文件' : '預覽文件')+'</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
     }).join('') : '<div class="lh-muted">尚無列印任務</div>';
-    slot.querySelectorAll('.lh-print').forEach((button) => button.onclick = () => window.open(tasks[Number(button.dataset.task)].combinedUrl, '_blank'));
+    slot.querySelectorAll('.lh-print').forEach(button=>button.onclick=()=>previewTask(tasks[Number(button.dataset.task)]));
   }
 
   async function mergeNativeDocuments(task) {
@@ -238,10 +278,8 @@
       const orderedPacking = globalThis.LHPackingSlip.matchPackingToLabels(rowsByPage,labelOrderIds);
       const out = await PDFDocument.create();
       out.registerFontkit(window.fontkit);
-      const fontResponse = await fetch(chrome.runtime.getURL('vendor/NotoSansTC.ttf'));
-      if (!fontResponse.ok) throw new Error('中文字型載入失敗');
-      const font = await out.embedFont(await fontResponse.arrayBuffer(), {subset:false});
-      const numberFont = await out.embedFont(window.PDFLib.StandardFonts.HelveticaBold);
+      const font = await out.embedFont(await loadChineseFontBytes(), {subset:false});
+      const numberFont = await out.embedFont(window.PDFLib.StandardFonts.CourierBold);
       for (let i=0;i<label.getPageCount();i++) {
         const packing=orderedPacking[i];
         out.addPage((await out.copyPages(label,[i]))[0]);
@@ -252,7 +290,7 @@
       if (task.cancelled) return;
       task.combinedUrl = URL.createObjectURL(new Blob([output], { type: 'application/pdf' }));
       window.clearTimeout(task.waitTimer);
-      task.progress = 100; task.detail = '文件已完成'; renderTasks();
+      markTaskReady(task);
     } catch (error) { if(!task.cancelled)failTask(task,`合併失敗：${error.message}`); }
     finally { task.merging = false; }
   }
@@ -273,7 +311,7 @@
   function makePanel() {
     panel = document.createElement('aside'); panel.id = PANEL_ID;
     panel.innerHTML = `<div class="lh-head">LEISURE HOMME 出貨印單助手 <small>v${VERSION}</small> <button class="lh-close" title="關閉">×</button></div>
-      <div class="lh-body"><p class="lh-section-title">已選訂單 <span class="lh-count">0</span></p><div class="lh-orders"></div>
+      <div class="lh-body"><p class="lh-section-title"><span class="lh-count">已選 0 個訂單</span></p><div class="lh-orders"></div>
       <div class="lh-mode-hint lh-warning" role="status" hidden></div>
       <hr><div class="lh-task-heading"><p class="lh-section-title">列印任務</p><button class="lh-clear-tasks" type="button">清除所有任務</button></div><div class="lh-tasks"></div></div>`;
     document.documentElement.append(panel);
