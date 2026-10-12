@@ -8,7 +8,7 @@
   function extractRows(items) {
     const text = items.filter(i => i.str?.trim()).map(i => ({
       text: i.str.normalize('NFKC').trim(), x: i.transform[4], y: i.transform[5], width:i.width || 0,
-      height: Math.abs(i.height || i.transform[3] || 10)
+      height: Math.abs(i.height || i.transform[3] || 10), fontName:i.fontName
     }));
     const lines = [];
     for (const item of [...text].sort((a,b) => b.y-a.y || a.x-b.x)) {
@@ -50,7 +50,19 @@
     const rows = starts.map((start,index) => {
       if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) throw new Error('裝箱單商品序號不連續，無法安全重排');
       const bottom = starts[index+1]?.y ?? (footer ? footer.y+3 : -Infinity);
-      const group = body.filter(i=>i.y<=start.y+3 && i.y>bottom+3);
+      const group = body.filter(i=>i.y<=start.y+3 && i.y>bottom+3).flatMap(i=>{
+        // PDF.js can combine a size suffix and the adjacent quantity (",M 1").
+        // Split only when measured same-font digit widths place the final token
+        // exactly at the quantity column on this row's first baseline.
+        const match=i.text.match(/^([,，]\s*[A-Z0-9]+)\s+(\d+)$/i);
+        if (!match || !i.fontName || i.x<columns.spec-3 || i.x>=columns.qty-3 || Math.abs(i.y-start.y)>=3) return [i];
+        const widths=body.filter(t=>t.fontName===i.fontName && Math.abs(t.height-i.height)<.01 && /^\d+$/.test(t.text) && t.width>0).map(t=>t.width/t.text.length);
+        if (!widths.length || Math.max(...widths)-Math.min(...widths)>.01) return [i];
+        const qtyWidth=widths[0]*match[2].length;
+        const qtyX=i.x+i.width-qtyWidth;
+        if (Math.abs(qtyX-columns.qty)>.5 || qtyX+qtyWidth>(columns.total ?? Infinity)-3) return [i];
+        return [{...i,text:match[1],width:qtyX-i.x},{...i,text:match[2],x:qtyX,width:qtyWidth}];
+      });
       const field = (left,right) => group.filter(i=>i.x>=left-3 && i.x<right-3).sort((a,b)=>b.y-a.y || a.x-b.x).map(i=>i.text).join(' ').trim();
       let sku=field(columns.sku,columns.name ?? columns.variantSku ?? columns.spec);
       const variantSku=columns.variantSku === null ? '' : compact(field(columns.variantSku,columns.spec));
@@ -60,7 +72,8 @@
         sku=variantSku.match(/^([A-Z]{2}\d{2})_[A-Z0-9]+_[A-Z0-9]+$/i)?.[1] || '';
       }
       const spec=field(columns.spec,columns.qty).replace(/([\u3400-\u9fff!！])\s+(?=[\u3400-\u9fff])/g,'$1').replace(/\s*([,，])\s*/g,' / ');
-      const qty=compact(field(columns.qty,columns.total ?? Infinity));
+      const qtyItems=group.filter(i=>i.x>=columns.qty-3 && i.x<(columns.total ?? Infinity)-3);
+      const qty=qtyItems.length===1 ? compact(qtyItems[0].text) : '';
       if (!/^[A-Za-z0-9][A-Za-z0-9_. /-]*$/.test(sku) || !spec || !/^\d+$/.test(qty) || Number(qty)<1 || !Number.isSafeInteger(Number(qty))) {
         throw new Error(`第 ${index+1} 列貨號、規格或數量不完整，已停止產生`);
       }

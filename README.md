@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.9.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.9.1**（本機修正版；公開下載仍為 v0.9.0）。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 安裝
 
