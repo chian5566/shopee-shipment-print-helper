@@ -35,9 +35,9 @@
     return [...new Set([...own,...Object.values(value).flatMap(child=>findJobIds(child,depth+1))])];
   }
   window.addEventListener('message', (event) => {
-    if (event.source === window && event.data?.source === 'lh-print' && event.data.type === 'BACKGROUND_PREVIEW') {
+    if (event.source === window && event.data?.source === 'lh-print' && ['BACKGROUND_PREVIEW','BACKGROUND_SEVEN_PREVIEW'].includes(event.data.type)) {
       const task=activeTask;
-      if (task && !task.cancelled && !task.failed && event.data.taskId===task.id) chrome.runtime.sendMessage({type:'OPEN_BACKGROUND_PREVIEW',taskId:task.id,url:event.data.url},response=>{
+      if (task && !task.cancelled && !task.failed && event.data.taskId===task.id && (event.data.type!=='BACKGROUND_SEVEN_PREVIEW' || task.sevenEleven)) chrome.runtime.sendMessage({type:event.data.type==='BACKGROUND_SEVEN_PREVIEW'?'OPEN_BACKGROUND_SEVEN_PREVIEW':'OPEN_BACKGROUND_PREVIEW',taskId:task.id,url:event.data.url},response=>{
         if((chrome.runtime.lastError || !response?.ok) && activeTask===task && !task.cancelled && !task.combinedUrl) failTask(task,'背景文件開啟失敗，請重新下載。',new Error(chrome.runtime.lastError?.message || response?.error || '背景文件開啟失敗'));
       });
       return;
@@ -169,7 +169,7 @@
       cancelTask(activeTask);
     }
     activeTask=null;
-    document.documentElement.removeAttribute('data-lh-background-task');
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK'});
     renderMode();renderTasks();
     const mode=assistantMode();
@@ -187,6 +187,7 @@
     const task={id:startedAt+'-'+Math.random(),name:(mode.sevenEleven?'7-ELEVEN ':'')+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
+    if(task.sevenEleven)document.documentElement.setAttribute('data-lh-seven-background-task',task.id);
     chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
     task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,task.sevenEleven?'尚未取得完整文件，請確認 7-ELEVEN 服務單視窗已開啟、圖片載入完成且擴充功能已允許該網站。':'尚未取得完整文件，請重新下載。');},90000);
@@ -242,7 +243,7 @@
     task.failedAt=Date.now();task.error=errorInfo(error || new Error(detail));
     for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer,task.readyTimer])window.clearTimeout(timer);
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
-    if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');}
+    if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');}
     renderTasks();
   }
 
@@ -261,7 +262,7 @@
     closeErrorDialog();
     for (const task of tasks) cancelTask(task);
     activeTask=null;tasks=[];
-    document.documentElement.removeAttribute('data-lh-background-task');
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK'});
     renderTasks();
   }
@@ -306,7 +307,7 @@
     if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) return;
     task.merging = true;
     if(!task.sevenEleven)chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
-    document.documentElement.removeAttribute('data-lh-background-task');
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
     try {
       task.stage='載入原始 PDF';
       task.progress = 65; task.detail = '正在處理文件…'; renderTasks();

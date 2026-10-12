@@ -22,6 +22,26 @@ function openPreview(task,url,windowId,sendResponse=()=>{}) {
     task.backgroundTabs.add(tab.id);task.previews.set(tab.id,url.href);sendResponse({ok:true});
   });
 }
+// Preserve native blank-window/form submissions; restore Shopee only when its
+// task's verified 7-ELEVEN original is the foreground tab in the focused window.
+function backgroundSevenOriginal(task,tab){
+  if(!task.sevenEleven || !tab.active || task.restoredSevenTabs.has(tab.id) || task.restoringSevenTabs.has(tab.id) || Date.now()>task.until)return;
+  task.restoringSevenTabs.add(tab.id);
+  const finish=()=>task.restoringSevenTabs.delete(tab.id);
+  chrome.windows.get(tab.windowId,originalWindow=>{
+    if(chrome.runtime.lastError || !originalWindow?.focused || tasks.get(task.sourceTabId)!==task){finish();return;}
+    chrome.tabs.get(task.sourceTabId,source=>{
+      if(chrome.runtime.lastError || !sourceTab({tab:source}) || tasks.get(task.sourceTabId)!==task){finish();return;}
+      chrome.tabs.update(source.id,{active:true},()=>{
+        if(chrome.runtime.lastError || tasks.get(task.sourceTabId)!==task){finish();return;}
+        chrome.windows.update(source.windowId,{focused:true},()=>{
+          if(!chrome.runtime.lastError)task.restoredSevenTabs.add(tab.id);
+          finish();
+        });
+      });
+    });
+  });
+}
 function currentTask(sender) {
   const tab=sender.tab;if(!tab)return null;
   const url=previewUrl(tab.url);
@@ -61,7 +81,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     if(matches.length!==1){sendResponse({ok:false});return;}
     const task=matches[0];
     if(message.type==='GET_SEVEN_TASK'){
-      task.sevenPreviews.add(sender.tab.id);sendResponse({ok:true,taskId:task.taskId,orderIds:task.orderIds});return;
+      task.sevenPreviews.add(sender.tab.id);backgroundSevenOriginal(task,sender.tab);sendResponse({ok:true,taskId:task.taskId,orderIds:task.orderIds});return;
     }
     if(task.sevenDelivered || task.sevenDelivering){sendResponse({ok:false});return;}
     try{globalThis.LHSevenEleven.validateLabels(message.labels,task.orderIds);}catch{sendResponse({ok:false});return;}
@@ -72,7 +92,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       task.sevenDelivered=true;task.sevenLabelTab={id:sender.tab.id,url:sender.tab.url};sendResponse({ok:true});
     });return true;
   }
-  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW','COMPLETE_DOCUMENT_TASK'].includes(message.type)) {
+  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW','COMPLETE_DOCUMENT_TASK','OPEN_BACKGROUND_SEVEN_PREVIEW'].includes(message.type)) {
     if (!sourceTab(sender)) {sendResponse({ok:false});return;}
     const sourceId=sender.tab.id;
     if(message.type==='START_DOCUMENT_TASK') {
@@ -80,7 +100,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       const orderIds=message.sevenEleven ? message.orderIds : [];
       if(message.sevenEleven && (!Array.isArray(orderIds) || !orderIds.length || orderIds.length>100 || new Set(orderIds).size!==orderIds.length || orderIds.some(id=>typeof id!=='string' || !/^\d{6}[A-Z0-9]{6,20}$/i.test(id)))){sendResponse({ok:false});return;}
       stopTask(tasks.get(sourceId));
-      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),orderIds,sevenPreviews:new Set(),sevenDelivered:false});
+      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
       sendResponse({ok:true});return;
     }
     const task=tasks.get(sourceId);
@@ -102,6 +122,16 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       });return true;
     }
     if(!task || task.taskId!==message.taskId || Date.now()>task.until){sendResponse({ok:false});return;}
+    if(message.type==='OPEN_BACKGROUND_SEVEN_PREVIEW'){
+      if(!task.sevenEleven || !sevenUrl(message.url)){sendResponse({ok:false});return;}
+      if(task.openedSevenUrls.has(message.url)){sendResponse({ok:true});return;}
+      if(task.openedSevenUrls.size>=2){sendResponse({ok:false});return;}
+      task.openedSevenUrls.add(message.url);
+      chrome.tabs.create({url:message.url,active:false,openerTabId:sourceId,windowId:sender.tab.windowId},tab=>{
+        if(chrome.runtime.lastError || !tab?.id){task.openedSevenUrls.delete(message.url);sendResponse({ok:false});return;}
+        sendResponse({ok:tasks.get(sourceId)===task});
+      });return true;
+    }
     if(message.type==='REGISTER_DOCUMENT_JOBS') {
       for (const id of Array.isArray(message.jobIds)?message.jobIds.slice(0,8):[]) if(typeof id==='string' && id.length<=160)task.jobIds.add(id);
       for(const [href,windowId] of task.pendingUrls) {
@@ -135,6 +165,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
 chrome.tabs.onUpdated.addListener((tabId,_changeInfo,tab)=>{
   if(_changeInfo.status==='loading')for(const task of tasks.values())if(task.sevenLabelTab?.id===tabId)task.sevenLabelTab=null;
   const task=tasks.get(tab.openerTabId),url=previewUrl(tab.url);
+  if(task && sevenUrl(tab.url || tab.pendingUrl))backgroundSevenOriginal(task,tab);
   if(task && Date.now()<=task.until && url && task.jobIds.has(url.searchParams.get('job_id')))task.previews.set(tabId,url.href);
 });
 chrome.tabs.onRemoved.addListener(tabId=>{
