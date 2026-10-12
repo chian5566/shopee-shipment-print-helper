@@ -1,5 +1,7 @@
 // Only in-memory state. Each source tab owns its own task and preview tabs.
 const tasks=new Map();
+if(typeof importScripts==='function')importScripts('seven-eleven.js');
+const sevenUrl=value=>{try{const u=new URL(value);return u.origin==='https://epayment.7-11.com.tw' && u.pathname==='/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx';}catch{return false;}};
 const SOURCE='https://seller.shopee.tw/portal/sale/mass/ship';
 const sourceTab=sender=>sender.tab?.url?.startsWith(SOURCE);
 function previewUrl(value) {
@@ -18,6 +20,26 @@ function openPreview(task,url,windowId,sendResponse=()=>{}) {
     if(chrome.runtime.lastError || !tab?.id){task.openedUrls.delete(url.href);sendResponse({ok:false});return;}
     if(tasks.get(task.sourceTabId)!==task){chrome.tabs.remove(tab.id,()=>void chrome.runtime.lastError);sendResponse({ok:false});return;}
     task.backgroundTabs.add(tab.id);task.previews.set(tab.id,url.href);sendResponse({ok:true});
+  });
+}
+// Preserve native blank-window/form submissions; restore Shopee only when its
+// task's verified 7-ELEVEN original is the foreground tab in the focused window.
+function backgroundSevenOriginal(task,tab){
+  if(!task.sevenEleven || !tab.active || task.restoredSevenTabs.has(tab.id) || task.restoringSevenTabs.has(tab.id) || Date.now()>task.until)return;
+  task.restoringSevenTabs.add(tab.id);
+  const finish=()=>task.restoringSevenTabs.delete(tab.id);
+  chrome.windows.get(tab.windowId,originalWindow=>{
+    if(chrome.runtime.lastError || !originalWindow?.focused || tasks.get(task.sourceTabId)!==task){finish();return;}
+    chrome.tabs.get(task.sourceTabId,source=>{
+      if(chrome.runtime.lastError || !sourceTab({tab:source}) || tasks.get(task.sourceTabId)!==task){finish();return;}
+      chrome.tabs.update(source.id,{active:true},()=>{
+        if(chrome.runtime.lastError || tasks.get(task.sourceTabId)!==task){finish();return;}
+        chrome.windows.update(source.windowId,{focused:true},()=>{
+          if(!chrome.runtime.lastError)task.restoredSevenTabs.add(tab.id);
+          finish();
+        });
+      });
+    });
   });
 }
 function currentTask(sender) {
@@ -43,7 +65,7 @@ chrome.action.onClicked.addListener(async tab=>{
       // Recover old tabs without showing an extra menu or refreshing Shopee.
       await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',files:['network-hook.js']});
       await chrome.scripting.insertCSS({target:{tabId:tab.id},files:['panel.css']});
-      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','print-layout.js','packing-slip.js','content.js']});
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','print-layout.js','packing-slip.js','seven-eleven.js','content.js']});
       await chrome.tabs.sendMessage(tab.id,{type:'OPEN_PANEL'});
     } catch (_) {
       chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});
@@ -51,13 +73,34 @@ chrome.action.onClicked.addListener(async tab=>{
   }
 });
 chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
-  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW'].includes(message.type)) {
+  if(message.type==='GET_SEVEN_TASK' || message.type==='SEVEN_LABELS_READY'){
+    if(!sevenUrl(sender.tab?.url)){sendResponse({ok:false});return;}
+    const matches=[...tasks.values()].filter(task=>task.sevenEleven && Date.now()<=task.until && (!sender.tab.openerTabId || sender.tab.openerTabId===task.sourceTabId) && (
+      message.type==='GET_SEVEN_TASK' ? Array.isArray(message.orderIds) && message.orderIds.length===task.orderIds.length && new Set(message.orderIds).size===message.orderIds.length && message.orderIds.every(id=>task.orderIds.includes(id)) : task.sevenPreviews.has(sender.tab.id) && message.taskId===task.taskId
+    ));
+    if(matches.length!==1){sendResponse({ok:false});return;}
+    const task=matches[0];
+    if(message.type==='GET_SEVEN_TASK'){
+      task.sevenPreviews.add(sender.tab.id);backgroundSevenOriginal(task,sender.tab);sendResponse({ok:true,taskId:task.taskId,orderIds:task.orderIds});return;
+    }
+    if(task.sevenDelivered || task.sevenDelivering){sendResponse({ok:false});return;}
+    try{globalThis.LHSevenEleven.validateLabels(message.labels,task.orderIds);}catch{sendResponse({ok:false});return;}
+    task.sevenDelivering=true;
+    chrome.tabs.sendMessage(task.sourceTabId,{type:'PREVIEW_SEVEN_LABELS',taskId:task.taskId,labels:message.labels},response=>{
+      task.sevenDelivering=false;
+      if(tasks.get(task.sourceTabId)!==task || chrome.runtime.lastError || !response?.ok){sendResponse({ok:false});return;}
+      task.sevenDelivered=true;task.sevenLabelTab={id:sender.tab.id,url:sender.tab.url};sendResponse({ok:true});
+    });return true;
+  }
+  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW','COMPLETE_DOCUMENT_TASK','OPEN_BACKGROUND_SEVEN_PREVIEW'].includes(message.type)) {
     if (!sourceTab(sender)) {sendResponse({ok:false});return;}
     const sourceId=sender.tab.id;
     if(message.type==='START_DOCUMENT_TASK') {
       if(typeof message.taskId!=='string' || message.taskId.length>128){sendResponse({ok:false});return;}
+      const orderIds=message.sevenEleven ? message.orderIds : [];
+      if(message.sevenEleven && (!Array.isArray(orderIds) || !orderIds.length || orderIds.length>100 || new Set(orderIds).size!==orderIds.length || orderIds.some(id=>typeof id!=='string' || !/^\d{6}[A-Z0-9]{6,20}$/i.test(id)))){sendResponse({ok:false});return;}
       stopTask(tasks.get(sourceId));
-      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map()});
+      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
       sendResponse({ok:true});return;
     }
     const task=tasks.get(sourceId);
@@ -65,7 +108,30 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       if(task && (!message.taskId || task.taskId===message.taskId))stopTask(task);
       sendResponse({ok:true});return;
     }
+    if(message.type==='COMPLETE_DOCUMENT_TASK') {
+      if(!task || task.taskId!==message.taskId || !task.sevenDelivered || task.finishing){sendResponse({ok:false});return;}
+      task.finishing=true;
+      const original=task.sevenLabelTab;
+      if(!original){stopTask(task);sendResponse({ok:true});return;}
+      chrome.tabs.get(original.id,tab=>{
+        const missing=chrome.runtime.lastError;
+        if(tasks.get(sourceId)!==task){sendResponse({ok:false});return;}
+        // Close only the original that delivered this task, if it has not navigated away.
+        if(!missing && tab?.url===original.url && sevenUrl(tab.url))chrome.tabs.remove(original.id,()=>void chrome.runtime.lastError);
+        stopTask(task);sendResponse({ok:true});
+      });return true;
+    }
     if(!task || task.taskId!==message.taskId || Date.now()>task.until){sendResponse({ok:false});return;}
+    if(message.type==='OPEN_BACKGROUND_SEVEN_PREVIEW'){
+      if(!task.sevenEleven || !globalThis.LHSevenEleven.isLaunchUrl(message.url)){sendResponse({ok:false});return;}
+      if(task.openedSevenUrls.has(message.url)){sendResponse({ok:true});return;}
+      if(task.openedSevenUrls.size>=2){sendResponse({ok:false});return;}
+      task.openedSevenUrls.add(message.url);
+      chrome.tabs.create({url:message.url,active:false,openerTabId:sourceId,windowId:sender.tab.windowId},tab=>{
+        if(chrome.runtime.lastError || !tab?.id){task.openedSevenUrls.delete(message.url);sendResponse({ok:false});return;}
+        sendResponse({ok:tasks.get(sourceId)===task});
+      });return true;
+    }
     if(message.type==='REGISTER_DOCUMENT_JOBS') {
       for (const id of Array.isArray(message.jobIds)?message.jobIds.slice(0,8):[]) if(typeof id==='string' && id.length<=160)task.jobIds.add(id);
       for(const [href,windowId] of task.pendingUrls) {
@@ -97,10 +163,12 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   }
 });
 chrome.tabs.onUpdated.addListener((tabId,_changeInfo,tab)=>{
+  if(_changeInfo.status==='loading')for(const task of tasks.values())if(task.sevenLabelTab?.id===tabId)task.sevenLabelTab=null;
   const task=tasks.get(tab.openerTabId),url=previewUrl(tab.url);
+  if(task && sevenUrl(tab.url || tab.pendingUrl))backgroundSevenOriginal(task,tab);
   if(task && Date.now()<=task.until && url && task.jobIds.has(url.searchParams.get('job_id')))task.previews.set(tabId,url.href);
 });
 chrome.tabs.onRemoved.addListener(tabId=>{
   stopTask(tasks.get(tabId));
-  for(const task of tasks.values()){task.backgroundTabs.delete(tabId);task.previews.delete(tabId);}
+  for(const task of tasks.values()){task.backgroundTabs.delete(tabId);task.previews.delete(tabId);if(task.sevenLabelTab?.id===tabId)task.sevenLabelTab=null;}
 });

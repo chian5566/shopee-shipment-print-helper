@@ -4,11 +4,25 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.9.2**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.10.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+
+## 物流支援
+
+| 物流方式 | 支援狀態 |
+| --- | :---: |
+| 蝦皮店到店-隔日到貨 | ✅ |
+| 蝦皮店到店 | ✅ |
+| 店到家宅配 | ✅ |
+| 7-ELEVEN | ✅ |
+| 新竹物流 | ✅ |
+| 全家 | ❌ |
+| 其他寄送方式 | ❌ |
+
+✅ 可由助手整理寄件單與裝箱單；❌ 尚未支援，請使用蝦皮原本的下載方式。
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.9.2/shopee-shipment-print-helper-v0.9.2.zip" target="_blank" rel="noopener noreferrer">下載 v0.9.2 安裝檔</a>（`shopee-shipment-print-helper-v0.9.2.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.10.0/shopee-shipment-print-helper-v0.10.0.zip" target="_blank" rel="noopener noreferrer">下載 v0.10.0 安裝檔</a>（`shopee-shipment-print-helper-v0.10.0.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
@@ -19,11 +33,13 @@
 
 1. 前往蝦皮 <a href="https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301" target="_blank" rel="noopener noreferrer">批次出貨 → 下載出貨文件</a>。
 2. 點「印」字圖示開啟助手，確認要出貨的訂單（助手會先選取目前頁面的訂單）。
-3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」。
+3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」（7-ELEVEN 使用原生服務單，不需選此格式）。
 4. 按蝦皮的「下載所選文件」。
 5. 助手顯示「文件已完成，可預覽」後，按「預覽文件」，再從預覽視窗列印。
 
-列印紙張選 **100 × 150 mm**，目前建議自訂縮放 **125%**；先確認預覽再印。
+列印紙張選 **100 × 150 mm**，目前建議自訂縮放 **125%**；先確認預覽再印。助手會將新竹物流寄件單預先縮至 80%，配合 125% 列印還原尺寸，避免滿版內容超出紙張。
+
+7-ELEVEN 原單會在背景處理，等待助手完成即可；合併文件成功產生後會自動關閉原單。原始 QR 圖片在本機擷取，按訂單編號與裝箱單配對。**7-ELEVEN 與其他物流請分開下載。**
 
 選「一般列印」時，仍可使用蝦皮原本的下載方式，但助手不會整理文件。重新整理頁面會清空助手的列印任務。
 

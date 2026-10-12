@@ -1,0 +1,25 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let handler,updated;const created=[],activated=[],focused=[];let originalFocused=true,sourceUrl='https://seller.shopee.tw/portal/sale/mass/ship',holdSource=false,pendingSource;
+const seven='https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx',ids=['250101TEST0001'];
+const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},windows:{get(id,cb){cb({id,focused:originalFocused});},update(id,opts,cb){focused.push({id,...opts});cb();}},tabs:{get(id,cb){const run=()=>cb({id,url:sourceUrl,windowId:7});if(holdSource)pendingSource=run;else run();},update(id,opts,cb){activated.push({id,...opts});cb();},create(opts,cb){created.push(opts);cb({id:100+created.length});},onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(){}},remove(){}}};
+vm.runInNewContext(fs.readFileSync(require.resolve('../seven-eleven.js'),'utf8')+'\n'+fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL});
+function send(msg,id=1,url=sourceUrl){let reply;handler(msg,{tab:{id,url,windowId:7}},r=>reply=r);return reply;}
+const start=(taskId,sevenEleven=true)=>send({type:'START_DOCUMENT_TASK',taskId,sevenEleven,orderIds:ids});
+start('t');assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:seven}).ok,true);assert.equal(created.length,1);assert.equal(created[0].active,false);assert.equal(created[0].openerTabId,1);assert.equal(created[0].windowId,7);
+send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:seven});assert.equal(created.length,1);
+assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'old',url:seven}).ok,false);
+assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:seven},2).ok,false);
+assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:'https://example.com'}).ok,false);
+const redirect='https://sellerfulfilment-shipment-sea.cache.susercontent.com/sd-sg-0/global-0001_test--html_c2c_shipping_label_redirect.html';
+assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:redirect}).ok,true);assert.equal(created[1].active,false);assert.equal(created[1].url,redirect);
+for(const url of [redirect.replace('https:','http:'),redirect.replace('.com/', '.com.evil.example/'),redirect.replace('html_c2c_shipping_label_redirect','packing_slip'),redirect.replace('/sd-sg-0/','/other/')])assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url}).ok,false);
+const tab={id:30,openerTabId:1,windowId:8,active:true,url:seven};
+updated(30,{status:'loading'},tab);assert.deepEqual(activated,[{id:1,active:true}]);assert.deepEqual(focused,[{id:7,focused:true}]);
+updated(30,{status:'complete'},tab);assert.equal(focused.length,1);
+updated(31,{status:'complete'},{...tab,id:31,active:false});assert.equal(focused.length,1);
+updated(32,{status:'complete'},{...tab,id:32,url:'https://example.com'});assert.equal(focused.length,1);
+originalFocused=false;updated(33,{status:'complete'},{...tab,id:33});assert.equal(focused.length,1);originalFocused=true;
+sourceUrl='https://seller.shopee.tw/portal/home';updated(34,{status:'complete'},{...tab,id:34});assert.equal(focused.length,1);sourceUrl='https://seller.shopee.tw/portal/sale/mass/ship';
+holdSource=true;updated(35,{status:'complete'},{...tab,id:35});send({type:'STOP_DOCUMENT_TASK',taskId:'t'});pendingSource();holdSource=false;assert.equal(focused.length,1);
+start('ordinary',false);assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'ordinary',url:seven}).ok,false);updated(36,{status:'complete'},{...tab,id:36});assert.equal(focused.length,1);
+console.log('PASS: background 7-ELEVEN tab creation, duplicate/stale/wrong-source guards, native popup focus restoration once, inactive/unrelated/unfocused/cancelled/left-source cases untouched');

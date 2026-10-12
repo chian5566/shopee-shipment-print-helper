@@ -1,12 +1,24 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),manifest=require('../manifest.json');
 assert.equal(manifest.version,require('../package.json').version);
+const development=manifest.version_name?.includes('-dev');
+const uiVersion=fs.readFileSync(path.join(root,'content.js'),'utf8').match(/const VERSION = '([^']+)'/)[1];
+assert.equal(uiVersion,manifest.version+(development?'-dev':''),'Assistant header must match the package version');
+if(!development){
+ assert.equal(manifest.name,'LEISURE HOMME 出貨印單助手');
+ for(const [size,file] of Object.entries(manifest.icons))assert.equal(file,`icons/icon${size}.png`);
+ for(const [size,file] of Object.entries(manifest.action.default_icon))assert.equal(file,`icons/icon${size}.png`);
+ const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
+ assert.ok(readme.includes(`目前版本：**v${manifest.version}**`));
+ assert.ok(readme.includes(`/releases/download/v${manifest.version}/shopee-shipment-print-helper-v${manifest.version}.zip`),'README must download the current release');
+}
 assert.deepEqual(manifest.permissions,['tabs','scripting']);
-assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*']);
+assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx']);
 assert.equal(require('../package.json').license,'SEE LICENSE IN LICENSE.md');
 const required=new Set([...Object.values(manifest.icons),'LICENSE.md']);
 for(const script of manifest.content_scripts)for(const file of [...(script.js||[]),...(script.css||[])])required.add(file);
 required.add(manifest.background.service_worker);
+required.add('seven-eleven.js');
 assert.ok(!manifest.action.default_popup,'Toolbar must open the assistant directly');
 for(const rule of manifest.web_accessible_resources)for(const file of rule.resources)required.add(file);
 for(const file of required)assert.ok(fs.existsSync(path.join(root,file)),`Missing: ${file}`);
