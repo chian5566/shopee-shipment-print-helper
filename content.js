@@ -184,7 +184,8 @@
       tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
     const startedAt=Date.now(),expectedFiles=mode.sevenEleven?(documentCheckbox('撿貨單')?.checked?2:1):2;
-    const task={id:startedAt+'-'+Math.random(),name:(mode.sevenEleven?'7-ELEVEN ':'')+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),progress:10};
+    const carrierName=mode.sevenEleven?'7-ELEVEN ':orders.every(order=>globalThis.LHPrintLayout?.isHctOrder(order))?'新竹物流 ':'';
+    const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
     if(task.sevenEleven)document.documentElement.setAttribute('data-lh-seven-background-task',task.id);

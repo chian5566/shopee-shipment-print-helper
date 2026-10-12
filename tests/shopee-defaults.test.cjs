@@ -12,7 +12,7 @@ const document={addEventListener:(type,fn)=>events[type]=fn,createElement:()=>pa
 const windowEvents={};
 const window={dispatchEvent(){resizes++;},addEventListener(type,fn){windowEvents[type]=fn;},setInterval(fn,delay){intervals.push({fn,delay});},setTimeout(fn,delay){timeouts.push({fn,delay});},clearTimeout(){},clearInterval(){}};
 const chrome={runtime:{onMessage:{addListener(fn){runtimeListener=fn;}},sendMessage(message){sent.push(message);}}};
-vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8'),{window,document,chrome,console,atob,URL,Event,location});
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8'),{window,document,chrome,console,atob,URL,Event,location,LHPrintLayout:require('../print-layout.js')});
 const tick=intervals.find(i=>i.delay===250).fn;
 tick();assert.ok(selected);assert.ok(!label.checked&&!packing.checked&&!picklist.checked);assert.equal(label.clicks+packing.clicks+picklist.clicks,0);
 runtimeListener({type:'TOGGLE_PANEL'});assert.ok(panel.isConnected);assert.ok(!panel.querySelector('.lh-mode-hint').hidden);assert.equal(label.clicks+packing.clicks,0);
@@ -122,3 +122,8 @@ const otherRow={...row,innerText:'buyer 蝦皮店到店',querySelector(selector)
 document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();assert.match(panel.querySelector('.lh-mode-hint').textContent,/分開下載/);sent.length=0;native.click();assert.ok(!sent.some(m=>m.type==='START_DOCUMENT_TASK'));
 assert.equal(attributes['data-lh-seven-background-task'],undefined);
 console.log('PASS: 7-ELEVEN HTML mode, packing/picklist counts, thermal unchanged, mixed-carrier native fallback');
+document.querySelectorAll=originalQueries;row.innerText='buyer 新竹物流';thermal.checked=true;tick();native.click();
+assert.match(panel.querySelector('.lh-tasks').innerHTML,/新竹物流 寄件單＋裝箱單 × 1 筆/);
+document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();native.click();
+assert.equal(panel.querySelector('.lh-tasks').innerHTML.match(/<b>(.*?)<\/b>/)[1],'寄件單＋裝箱單 × 2 筆');
+console.log('PASS: HCT task title includes carrier; mixed-carrier task title remains generic');
