@@ -346,7 +346,11 @@
       for (let i=0;i<labelOrderIds.length;i++) {
         const packing=orderedPacking[i];
         if(task.sevenEleven)await globalThis.LHSevenEleven.appendLabel(out,task.sevenLabels[i],window.PDFLib);
-        else out.addPage((await out.copyPages(label,[i]))[0]);
+        else {
+          const order=task.orders.find(order=>order.orderId===labelOrderIds[i]);
+          if(globalThis.LHPrintLayout.isHctOrder(order))await globalThis.LHPrintLayout.appendHctLabel(out,label.getPage(i),window.PDFLib);
+          else out.addPage((await out.copyPages(label,[i]))[0]);
+        }
         await globalThis.LHPackingSlip.appendRows(out,packing.rows,{font,numberFont},window.PDFLib,packing.buyerNote,packing.orderId);
       }
       if (task.cancelled) return;
