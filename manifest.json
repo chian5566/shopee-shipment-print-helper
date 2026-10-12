@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "LEISURE HOMME 出貨印單助手（開發版）",
+  "name": "LEISURE HOMME 出貨印單助手",
   "description": "在蝦皮批次出貨頁整理已選訂單，下載原生寄件單並列印 100 x 150 mm 裝箱單。",
   "version": "0.10.0",
   "action": {
     "default_title": "開啟 LEISURE HOMME 出貨印單助手",
     "default_icon": {
-      "16": "icons/dev/icon16.png",
-      "32": "icons/dev/icon32.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
     }
   },
   "background": {
@@ -83,10 +83,9 @@
     }
   ],
   "icons": {
-    "16": "icons/dev/icon16.png",
-    "32": "icons/dev/icon32.png",
-    "48": "icons/dev/icon48.png",
-    "128": "icons/dev/icon128.png"
-  },
-  "version_name": "0.10.0-dev (7-ELEVEN)"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
