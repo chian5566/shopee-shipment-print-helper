@@ -2,7 +2,9 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.9.0';
+  const VERSION = '0.9.2';
+  const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
+  let errorDialog;
   let panel;
   let refreshTimer;
   let tasks = [];
@@ -36,7 +38,7 @@
     if (event.source === window && event.data?.source === 'lh-print' && event.data.type === 'BACKGROUND_PREVIEW') {
       const task=activeTask;
       if (task && !task.cancelled && !task.failed && event.data.taskId===task.id) chrome.runtime.sendMessage({type:'OPEN_BACKGROUND_PREVIEW',taskId:task.id,url:event.data.url},response=>{
-        if((chrome.runtime.lastError || !response?.ok) && activeTask===task && !task.cancelled && !task.combinedUrl) failTask(task,'背景文件開啟失敗，請重新下載。');
+        if((chrome.runtime.lastError || !response?.ok) && activeTask===task && !task.cancelled && !task.combinedUrl) failTask(task,'背景文件開啟失敗，請重新下載。',new Error(chrome.runtime.lastError?.message || response?.error || '背景文件開啟失敗'));
       });
       return;
     }
@@ -174,11 +176,11 @@
     const orders=selectedOrders();
     if(!panel?.isConnected)makePanel();
     if(!orders.length) {
-      tasks.unshift({name:'寄件單＋裝箱單',detail:'未讀取到已選訂單，請重新勾選訂單。',startedAt:Date.now(),failed:true,progress:0});
-      renderTasks();return;
+      const task={name:'寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
+      tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
     const startedAt=Date.now(),expectedFiles=2;
-    const task={id:startedAt+'-'+Math.random(),name:'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',startedAt,orders,expectedFiles,progress:10};
+    const task={id:startedAt+'-'+Math.random(),name:'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
     chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles});
@@ -186,8 +188,54 @@
     task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && (task.previewFiles?.length||0)<task.expectedFiles && !task.combinedUrl && !task.failed)failTask(task,'尚未取得完整文件，請重新下載。');},90000);
   }
 
-  function failTask(task,detail) {
+  function errorInfo(error) {
+    if (!error) return null;
+    return {name:String(error.name || 'Error'),message:String(error.message || error),stack:String(error.stack || ''),cause:error.cause ? String(error.cause.message || error.cause) : ''};
+  }
+
+  function diagnosticText(task) {
+    return 'LEISURE HOMME 出貨印單助手｜錯誤回報\n'+JSON.stringify({
+      version:VERSION,startedAt:new Date(task.startedAt).toISOString(),failedAt:task.failedAt ? new Date(task.failedAt).toISOString() : null,
+      stage:task.stage || '未知階段',message:task.detail,error:task.error || null,
+      browser:navigator.userAgent,page:location.origin+location.pathname,
+      selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
+      receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || []
+    },null,2);
+  }
+
+  function closeErrorDialog() {
+    if (errorDialog) {errorDialog.close();errorDialog=null;}
+  }
+
+  function showErrorDetails(task,trigger) {
+    if (!task?.failed || task.cancelled) return;
+    closeErrorDialog();
+    const dialog=document.createElement('dialog');errorDialog=dialog;dialog.id='lh-error-dialog';
+    dialog.setAttribute('aria-labelledby','lh-error-title');
+    dialog.innerHTML=`<div class="lh-error-heading"><h2 id="lh-error-title">錯誤詳情</h2><button type="button" class="lh-error-close" aria-label="關閉錯誤詳情">×</button></div>
+      <p>請複製下方錯誤資訊，貼到 Google 表單，協助完善這個功能。</p>
+      <textarea class="lh-error-text" aria-label="可複製的錯誤資訊" readonly spellcheck="false"></textarea>
+      <p class="lh-error-copy-status" role="status" aria-live="polite"></p>
+      <div class="lh-error-actions"><button type="button" class="lh-error-copy">複製錯誤資訊</button><a href="${REPORT_URL}" target="_blank" rel="noopener noreferrer">開啟回報表單 ↗</a><button type="button" class="lh-error-done">關閉</button></div>`;
+    const textarea=dialog.querySelector('.lh-error-text');textarea.value=diagnosticText(task);
+    const status=dialog.querySelector('.lh-error-copy-status');
+    dialog.querySelector('.lh-error-copy').onclick=async()=>{
+      try {
+        await navigator.clipboard.writeText(textarea.value);status.textContent='已複製，可貼到回報表單。';
+      } catch {
+        textarea.focus();textarea.select();status.textContent='無法自動複製，已選取全部內容，請按 Ctrl+C（Mac：⌘C）複製。';
+      }
+    };
+    dialog.querySelector('.lh-error-close').onclick=()=>dialog.close();
+    dialog.querySelector('.lh-error-done').onclick=()=>dialog.close();
+    dialog.addEventListener('close',()=>{dialog.remove();if(errorDialog===dialog)errorDialog=null;if(trigger?.isConnected)trigger.focus();},{once:true});
+    document.documentElement.append(dialog);dialog.showModal();
+  }
+
+  function failTask(task,detail,error) {
     task.failed=true;task.progress=0;task.detail=detail;
+    task.failedAt=Date.now();task.error=errorInfo(error || new Error(detail));
     for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer,task.readyTimer])window.clearTimeout(timer);
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
     if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');}
@@ -206,6 +254,7 @@
   }
 
   function clearTasks() {
+    closeErrorDialog();
     for (const task of tasks) cancelTask(task);
     activeTask=null;tasks=[];
     document.documentElement.removeAttribute('data-lh-background-task');
@@ -242,9 +291,11 @@
       const animation=flashing ? ` style="--lh-ready-delay:-${readyAge}ms"` : '';
       const previewTime=task.lastPreviewAt ? new Date(task.lastPreviewAt) : null;
       const previewStatus=task.combinedUrl ? `<span class="lh-preview-state">${previewTime ? '已預覽' : '尚未預覽'}</span>${previewTime ? `<time class="lh-task-time" datetime="${previewTime.toISOString()}">上次預覽：${escapeHtml(previewTime.toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hourCycle:'h23'}))}</time>` : ''}` : '';
-      return `<div class="lh-task${stateClass}${flashing ? ' lh-ready-flash' : ''}"${animation}><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><span>${escapeHtml(task.detail)}</span>${progress}${previewStatus}${task.previewError ? `<span class="lh-preview-error">${escapeHtml(task.previewError)}</span>` : ''}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">'+(previewTime ? '再次預覽文件' : '預覽文件')+'</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
+      const errorActions=task.failed && !task.cancelled ? `<p class="lh-error-report">發生錯誤？請<a href="${REPORT_URL}" target="_blank" rel="noopener noreferrer">回報到 Google 表單</a>，協助完善這個功能。</p><button type="button" class="lh-error-details" data-task="${index}">查看錯誤詳情</button>` : '';
+      return `<div class="lh-task${stateClass}${flashing ? ' lh-ready-flash' : ''}"${animation}><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><span>${escapeHtml(task.detail)}</span>${errorActions}${progress}${previewStatus}${task.previewError ? `<span class="lh-preview-error">${escapeHtml(task.previewError)}</span>` : ''}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">'+(previewTime ? '再次預覽文件' : '預覽文件')+'</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
     }).join('') : '<div class="lh-muted">尚無列印任務</div>';
     slot.querySelectorAll('.lh-print').forEach(button=>button.onclick=()=>previewTask(tasks[Number(button.dataset.task)]));
+    slot.querySelectorAll('.lh-error-details').forEach(button=>{const task=tasks[Number(button.dataset.task)];button.onclick=()=>showErrorDetails(task,button);});
   }
 
   async function mergeNativeDocuments(task) {
@@ -253,6 +304,7 @@
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
     document.documentElement.removeAttribute('data-lh-background-task');
     try {
+      task.stage='載入原始 PDF';
       task.progress = 65; task.detail = '正在處理文件…'; renderTasks();
       const files = task.previewFiles.slice(0, 3).map(file=>file.bytes);
       task.sourceUrls?.forEach(url=>URL.revokeObjectURL(url));
@@ -260,11 +312,14 @@
       task.failed = false;
       const { PDFDocument } = window.PDFLib;
       const docs = await Promise.all(files.map((bytes) => PDFDocument.load(bytes)));
+      task.documentInfo=docs.map((doc,index)=>({file:index+1,pages:doc.getPageCount(),pageSizes:doc.getPages().map(page=>page.getSize())}));
+      task.stage='辨識裝箱單';
       // Parse the table to identify the packing document; both source files may be thermal-sized.
       const pdfjs = await import(chrome.runtime.getURL('vendor/pdf.min.mjs'));
       globalThis.pdfjsWorker ||= await import(chrome.runtime.getURL('vendor/pdf.worker.min.mjs'));
       pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdf.worker.min.mjs');
       const candidates = await Promise.allSettled(files.map(bytes => globalThis.LHPackingSlip.readPacking(bytes, pdfjs)));
+      task.packingChecks=candidates.map((result,index)=>result.status==='fulfilled' ? {file:index+1,status:'parsed',orders:result.value.length,rows:result.value.map(section=>section.rows.length)} : {file:index+1,status:'rejected',error:errorInfo(result.reason)});
       const packingIndices = candidates.map((result,index) => result.status === 'fulfilled' && result.value.every(page=>page.orderId) ? index : -1).filter(index => index >= 0);
       if (packingIndices.length !== 1) throw new Error('無法唯一辨識裝箱單。' + candidates.filter(r=>r.status==='rejected').map(r=>r.reason.message).join('；'));
       const packingIndex = packingIndices[0];
@@ -272,11 +327,13 @@
       const labelIndices=docs.map((doc,index)=>index!==packingIndex && (files.length===2 || doc.getPage(0).getWidth()<=320)?index:-1).filter(index=>index>=0);
       if(labelIndices.length!==1)throw new Error('無法唯一辨識寄件單，請下載原始文件核對');
       const labelIndex=labelIndices[0],label=docs[labelIndex];
+      task.stage='配對訂單與寄件單';
       task.additionalUrls=task.sourceUrls.filter((url,index)=>index!==packingIndex&&index!==labelIndex);
       const labelOrderIds = await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
       if (rowsByPage.length!==task.orders.length || task.orders.some(order=>!rowsByPage.some(p=>p.orderId===order.orderId))) throw new Error('裝箱單與本次已選訂單不符，已停止產生');
       const orderedPacking = globalThis.LHPackingSlip.matchPackingToLabels(rowsByPage,labelOrderIds);
       const out = await PDFDocument.create();
+      task.stage='排版裝箱單';
       out.registerFontkit(window.fontkit);
       const font = await out.embedFont(await loadChineseFontBytes(), {subset:false});
       const numberFont = await out.embedFont(window.PDFLib.StandardFonts.CourierBold);
@@ -286,12 +343,13 @@
         await globalThis.LHPackingSlip.appendRows(out,packing.rows,{font,numberFont},window.PDFLib,packing.buyerNote,packing.orderId);
       }
       if (task.cancelled) return;
+      task.stage='儲存合併 PDF';
       const output=await out.save();
       if (task.cancelled) return;
       task.combinedUrl = URL.createObjectURL(new Blob([output], { type: 'application/pdf' }));
       window.clearTimeout(task.waitTimer);
       markTaskReady(task);
-    } catch (error) { if(!task.cancelled)failTask(task,`合併失敗：${error.message}`); }
+    } catch (error) { if(!task.cancelled)failTask(task,`合併失敗：${error.message}`,error); }
     finally { task.merging = false; }
   }
 
@@ -302,6 +360,7 @@
   }
 
   function closePanel() {
+    closeErrorDialog();
     panel?.remove();
     document.querySelector('#app')?.classList.remove('lh-page-pushed');
     window.clearInterval(refreshTimer);
@@ -362,6 +421,7 @@
     if (message.type === 'PREVIEW_PDF') {
       const task = activeTask; if (!task || task.cancelled || task.failed || task.combinedUrl || message.taskId !== task.id) return;
       try {
+        task.stage='讀取蝦皮文件';
         if(typeof message.base64!=='string' || message.base64.length>28*1024*1024)throw new Error('文件過大或格式無效');
         const raw=atob(message.base64);
         if (!raw.startsWith('%PDF-')) throw new Error('蝦皮預覽未提供有效 PDF');
@@ -369,7 +429,7 @@
         task.previewFiles ||= [];
         if (!task.previewFiles.some(file=>file.url===message.url)) task.previewFiles.push({url:message.url,bytes});
         sendResponse?.({ok:true});
-      } catch (error) {sendResponse?.({ok:false});failTask(task,`文件讀取失敗：${error.message}`);return;}
+      } catch (error) {sendResponse?.({ok:false});failTask(task,`文件讀取失敗：${error.message}`,error);return;}
       task.detail = '正在處理文件…'; task.progress = 55; renderTasks();
       if (task.previewFiles.length >= task.expectedFiles && !task.merging) {
         window.clearTimeout(task.mergeTimer);

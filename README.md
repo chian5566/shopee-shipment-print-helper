@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.9.1**（本機修正版；公開下載仍為 v0.9.0）。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.9.2**（本機修正版；公開下載仍為 v0.9.0）。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 安裝
 
@@ -44,3 +44,7 @@
 ## 支持作者
 
 此工具由 <a href="https://www.threads.com/@chian5566" target="_blank" rel="noopener noreferrer">@chian5566</a> 無償提供，若您覺得不錯想支持我，歡迎到 <a href="https://shopee.tw/shop/1853603/" target="_blank" rel="noopener noreferrer">LEISURE HOMME</a> 跟我買件衣服！我就會很開心了！
+
+### 錯誤回報
+
+失敗任務會顯示 Google 表單回報連結與「查看錯誤詳情」按鈕。點開視窗後可複製版本、失敗時間與階段、錯誤堆疊、文件大小與頁數、裝箱單辨識結果，再貼到回報表單。若無法自動複製，視窗會選取全文供手動複製。原始文件下載連結仍保留。

@@ -3,7 +3,7 @@ const source=fs.readFileSync(path.resolve(__dirname,'../content.js'),'utf8');
 const functions=source.slice(source.indexOf('  function markTaskReady('),source.indexOf('  async function mergeNativeDocuments'));
 let now=Date.parse('2026-10-10T04:00:00Z'),opened=true;const timers=[],opens=[];
 const tasks=[{name:'寄件單＋裝箱單',startedAt:now-1000,combinedUrl:'blob:test',progress:65},{name:'另一批文件',startedAt:now,progress:10}];
-let buttons=[];const slot={innerHTML:'',querySelectorAll(){buttons=[...this.innerHTML.matchAll(/data-task="(\d+)"/g)].map(m=>({dataset:{task:m[1]}}));return buttons;}};
+let buttons=[];const slot={innerHTML:'',querySelectorAll(selector){if(selector!=='.lh-print')return [];buttons=[...this.innerHTML.matchAll(/class="lh-print" data-task="(\d+)"/g)].map(m=>({dataset:{task:m[1]}}));return buttons;}};
 const clear={};const panel={isConnected:true,querySelector:s=>s==='.lh-tasks'?slot:clear};
 class TestDate extends Date {static now(){return now;}}
 const context={panel,tasks,Date:TestDate,escapeHtml:s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'),window:{setTimeout(fn,delay){timers.push({fn,delay});},open(url,target){opens.push({url,target});return opened?{}:null;}}};
