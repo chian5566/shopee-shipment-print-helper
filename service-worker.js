@@ -69,10 +69,10 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     chrome.tabs.sendMessage(task.sourceTabId,{type:'PREVIEW_SEVEN_LABELS',taskId:task.taskId,labels:message.labels},response=>{
       task.sevenDelivering=false;
       if(tasks.get(task.sourceTabId)!==task || chrome.runtime.lastError || !response?.ok){sendResponse({ok:false});return;}
-      task.sevenDelivered=true;sendResponse({ok:true});
+      task.sevenDelivered=true;task.sevenLabelTab={id:sender.tab.id,url:sender.tab.url};sendResponse({ok:true});
     });return true;
   }
-  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW'].includes(message.type)) {
+  if (['START_DOCUMENT_TASK','STOP_DOCUMENT_TASK','REGISTER_DOCUMENT_JOBS','OPEN_BACKGROUND_PREVIEW','COMPLETE_DOCUMENT_TASK'].includes(message.type)) {
     if (!sourceTab(sender)) {sendResponse({ok:false});return;}
     const sourceId=sender.tab.id;
     if(message.type==='START_DOCUMENT_TASK') {
@@ -87,6 +87,19 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     if (message.type==='STOP_DOCUMENT_TASK') {
       if(task && (!message.taskId || task.taskId===message.taskId))stopTask(task);
       sendResponse({ok:true});return;
+    }
+    if(message.type==='COMPLETE_DOCUMENT_TASK') {
+      if(!task || task.taskId!==message.taskId || !task.sevenDelivered || task.finishing){sendResponse({ok:false});return;}
+      task.finishing=true;
+      const original=task.sevenLabelTab;
+      if(!original){stopTask(task);sendResponse({ok:true});return;}
+      chrome.tabs.get(original.id,tab=>{
+        const missing=chrome.runtime.lastError;
+        if(tasks.get(sourceId)!==task){sendResponse({ok:false});return;}
+        // Close only the original that delivered this task, if it has not navigated away.
+        if(!missing && tab?.url===original.url && sevenUrl(tab.url))chrome.tabs.remove(original.id,()=>void chrome.runtime.lastError);
+        stopTask(task);sendResponse({ok:true});
+      });return true;
     }
     if(!task || task.taskId!==message.taskId || Date.now()>task.until){sendResponse({ok:false});return;}
     if(message.type==='REGISTER_DOCUMENT_JOBS') {
@@ -120,10 +133,11 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
   }
 });
 chrome.tabs.onUpdated.addListener((tabId,_changeInfo,tab)=>{
+  if(_changeInfo.status==='loading')for(const task of tasks.values())if(task.sevenLabelTab?.id===tabId)task.sevenLabelTab=null;
   const task=tasks.get(tab.openerTabId),url=previewUrl(tab.url);
   if(task && Date.now()<=task.until && url && task.jobIds.has(url.searchParams.get('job_id')))task.previews.set(tabId,url.href);
 });
 chrome.tabs.onRemoved.addListener(tabId=>{
   stopTask(tasks.get(tabId));
-  for(const task of tasks.values()){task.backgroundTabs.delete(tabId);task.previews.delete(tabId);}
+  for(const task of tasks.values()){task.backgroundTabs.delete(tabId);task.previews.delete(tabId);if(task.sevenLabelTab?.id===tabId)task.sevenLabelTab=null;}
 });

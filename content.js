@@ -305,7 +305,7 @@
   async function mergeNativeDocuments(task) {
     if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) return;
     task.merging = true;
-    chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
+    if(!task.sevenEleven)chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
     document.documentElement.removeAttribute('data-lh-background-task');
     try {
       task.stage='載入原始 PDF';
@@ -355,6 +355,7 @@
       task.combinedUrl = URL.createObjectURL(new Blob([output], { type: 'application/pdf' }));
       window.clearTimeout(task.waitTimer);
       markTaskReady(task);
+      if(task.sevenEleven)chrome.runtime.sendMessage({type:'COMPLETE_DOCUMENT_TASK',taskId:task.id});
     } catch (error) { if(!task.cancelled)failTask(task,`合併失敗：${error.message}`,error); }
     finally { task.merging = false; }
   }
