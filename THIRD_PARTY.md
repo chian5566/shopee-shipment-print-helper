@@ -8,6 +8,7 @@
 | pdf-lib | 1.17.1 | MIT；vendor/PDFLIB-LICENSE |
 | @pdf-lib/fontkit | 1.1.1，Hopding/fontkit | MIT；vendor/FONTKIT-LICENSE |
 | pako（fontkit 內含） | fontkit 相依元件 | MIT／Zlib；vendor/PAKO-LICENSE |
+| html2canvas | 1.4.1 | MIT；vendor/HTML2CANVAS-LICENSE |
 | Noto Sans TC | google/fonts 的 NotoSansTC[wght].ttf，固定為 400 字重以供 PDF 使用 | SIL OFL 1.1；vendor/NOTO-LICENSE |
 
 Noto 字型來源：https://github.com/google/fonts/tree/main/ofl/notosanstc

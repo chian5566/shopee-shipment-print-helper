@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LEISURE HOMME 出貨印單助手",
+  "name": "LEISURE HOMME 出貨印單助手（開發版）",
   "description": "在蝦皮批次出貨頁整理已選訂單，下載原生寄件單並列印 100 x 150 mm 裝箱單。",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "action": {
     "default_title": "開啟 LEISURE HOMME 出貨印單助手",
     "default_icon": {
@@ -18,7 +18,8 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://seller.shopee.tw/*"
+    "https://seller.shopee.tw/*",
+    "https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx"
   ],
   "web_accessible_resources": [
     {
@@ -61,10 +62,22 @@
         "vendor/pdf-lib.min.js",
         "print-layout.js",
         "packing-slip.js",
+        "seven-eleven.js",
         "content.js"
       ],
       "css": [
         "panel.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx"
+      ],
+      "js": [
+        "vendor/html2canvas.min.js",
+        "seven-eleven.js",
+        "seven-reader.js"
       ],
       "run_at": "document_idle"
     }
@@ -74,5 +87,6 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "version_name": "0.10.0-dev (7-ELEVEN)"
 }

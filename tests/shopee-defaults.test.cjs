@@ -109,3 +109,11 @@ runtimeListener({type:'GET_PAGE_STATUS'},null,value=>reply=value);assert.equal(r
 tick();assert.match(panel.querySelector('.lh-mode-hint').textContent,/批次出貨 → 下載出貨文件/);
 assert.match(panel.querySelector('.lh-mode-hint').innerHTML,/href="https:\/\/seller\.shopee\.tw\/portal\/sale\/mass\/ship\?mass_shipment_tab=301"/);
 console.log('PASS: off-page open, page hint, SPA recovery, earlier shipping step');
+
+// 7-ELEVEN uses its HTML original and packing PDF; no thermal-radio override.
+document.querySelectorAll=originalQueries;row.innerText='buyer 7-ELEVEN';thermal.checked=false;selected=true;label.checked=packing.checked=true;picklist.checked=false;tick();sent.length=0;native.click();
+let sevenStart=sent.findLast(m=>m.type==='START_DOCUMENT_TASK');assert.ok(sevenStart.sevenEleven);assert.equal(sevenStart.expectedFiles,1);assert.deepEqual(Array.from(sevenStart.orderIds),['250101TEST0002']);assert.equal(thermal.checked,false);
+picklist.checked=true;sent.length=0;native.click();assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').expectedFiles,2);
+const otherRow={...row,innerText:'buyer 蝦皮店到店',querySelector(selector){if(selector.includes('checkbox'))return {};return {textContent:'250101TEST0003',getAttribute:()=>'/portal/sale/order/124'};}};
+document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();assert.match(panel.querySelector('.lh-mode-hint').textContent,/分開下載/);sent.length=0;native.click();assert.ok(!sent.some(m=>m.type==='START_DOCUMENT_TASK'));
+console.log('PASS: 7-ELEVEN HTML mode, packing/picklist counts, thermal unchanged, mixed-carrier native fallback');

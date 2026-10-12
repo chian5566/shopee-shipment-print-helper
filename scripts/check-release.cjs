@@ -2,11 +2,12 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=path.resolve(__dirname,'..'),manifest=require('../manifest.json');
 assert.equal(manifest.version,require('../package.json').version);
 assert.deepEqual(manifest.permissions,['tabs','scripting']);
-assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*']);
+assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx']);
 assert.equal(require('../package.json').license,'SEE LICENSE IN LICENSE.md');
 const required=new Set([...Object.values(manifest.icons),'LICENSE.md']);
 for(const script of manifest.content_scripts)for(const file of [...(script.js||[]),...(script.css||[])])required.add(file);
 required.add(manifest.background.service_worker);
+required.add('seven-eleven.js');
 assert.ok(!manifest.action.default_popup,'Toolbar must open the assistant directly');
 for(const rule of manifest.web_accessible_resources)for(const file of rule.resources)required.add(file);
 for(const file of required)assert.ok(fs.existsSync(path.join(root,file)),`Missing: ${file}`);

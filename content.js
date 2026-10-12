@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.9.2';
+  const VERSION = '0.10.0-dev';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -141,6 +141,10 @@
     if (!documentCheckbox('寄件單')?.checked || !documentCheckbox('裝箱單')?.checked) {
       return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
     }
+    const orders=selectedOrders();
+    const sevenCount=orders.filter(order=>/7-ELEVEN/i.test(order.summary)).length;
+    if(sevenCount && sevenCount!==orders.length)return {enabled:false,hint:'請將 7-ELEVEN 與其他物流分開下載，避免寄件單格式混用。'};
+    if(sevenCount)return {enabled:true,hint:'',sevenEleven:true};
     if (!thermalLabelSelected()) return {enabled:false,hint:THERMAL_HINT};
     return {enabled:true,hint:''};
   }
@@ -179,13 +183,13 @@
       const task={name:'寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
       tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
-    const startedAt=Date.now(),expectedFiles=2;
-    const task={id:startedAt+'-'+Math.random(),name:'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,progress:10};
+    const startedAt=Date.now(),expectedFiles=mode.sevenEleven?(documentCheckbox('撿貨單')?.checked?2:1):2;
+    const task={id:startedAt+'-'+Math.random(),name:(mode.sevenEleven?'7-ELEVEN ':'')+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
-    chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles});
+    chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
-    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && (task.previewFiles?.length||0)<task.expectedFiles && !task.combinedUrl && !task.failed)failTask(task,'尚未取得完整文件，請重新下載。');},90000);
+    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,task.sevenEleven?'尚未取得完整文件，請確認 7-ELEVEN 服務單視窗已開啟、圖片載入完成且擴充功能已允許該網站。':'尚未取得完整文件，請重新下載。');},90000);
   }
 
   function errorInfo(error) {
@@ -200,7 +204,7 @@
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
       receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
-      documents:task.documentInfo || [],packingChecks:task.packingChecks || []
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0
     },null,2);
   }
 
@@ -244,7 +248,7 @@
 
   function releaseTaskFiles(task) {
     for (const url of new Set([task.combinedUrl,...(task.sourceUrls || []),...(task.additionalUrls || [])].filter(Boolean))) URL.revokeObjectURL(url);
-    task.combinedUrl=null;task.sourceUrls=[];task.additionalUrls=[];task.previewFiles=[];
+    task.combinedUrl=null;task.sourceUrls=[];task.additionalUrls=[];task.previewFiles=[];task.sevenLabels=null;
   }
 
   function cancelTask(task) {
@@ -299,7 +303,7 @@
   }
 
   async function mergeNativeDocuments(task) {
-    if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles) return;
+    if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) return;
     task.merging = true;
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
     document.documentElement.removeAttribute('data-lh-background-task');
@@ -325,11 +329,12 @@
       const packingIndex = packingIndices[0];
       const rowsByPage = candidates[packingIndex].value;
       const labelIndices=docs.map((doc,index)=>index!==packingIndex && (files.length===2 || doc.getPage(0).getWidth()<=320)?index:-1).filter(index=>index>=0);
-      if(labelIndices.length!==1)throw new Error('無法唯一辨識寄件單，請下載原始文件核對');
-      const labelIndex=labelIndices[0],label=docs[labelIndex];
+      if(!task.sevenEleven && labelIndices.length!==1)throw new Error('無法唯一辨識寄件單，請下載原始文件核對');
+      const labelIndex=labelIndices[0],label=task.sevenEleven?null:docs[labelIndex];
       task.stage='配對訂單與寄件單';
       task.additionalUrls=task.sourceUrls.filter((url,index)=>index!==packingIndex&&index!==labelIndex);
-      const labelOrderIds = await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
+      if(task.sevenEleven)globalThis.LHSevenEleven.validateLabels(task.sevenLabels,task.orders.map(order=>order.orderId));
+      const labelOrderIds = task.sevenEleven?task.sevenLabels.map(item=>item.orderId):await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
       if (rowsByPage.length!==task.orders.length || task.orders.some(order=>!rowsByPage.some(p=>p.orderId===order.orderId))) throw new Error('裝箱單與本次已選訂單不符，已停止產生');
       const orderedPacking = globalThis.LHPackingSlip.matchPackingToLabels(rowsByPage,labelOrderIds);
       const out = await PDFDocument.create();
@@ -337,9 +342,10 @@
       out.registerFontkit(window.fontkit);
       const font = await out.embedFont(await loadChineseFontBytes(), {subset:false});
       const numberFont = await out.embedFont(window.PDFLib.StandardFonts.CourierBold);
-      for (let i=0;i<label.getPageCount();i++) {
+      for (let i=0;i<labelOrderIds.length;i++) {
         const packing=orderedPacking[i];
-        out.addPage((await out.copyPages(label,[i]))[0]);
+        if(task.sevenEleven)await globalThis.LHSevenEleven.appendLabel(out,task.sevenLabels[i],window.PDFLib);
+        else out.addPage((await out.copyPages(label,[i]))[0]);
         await globalThis.LHPackingSlip.appendRows(out,packing.rows,{font,numberFont},window.PDFLib,packing.buyerNote,packing.orderId);
       }
       if (task.cancelled) return;
@@ -404,7 +410,7 @@
       if (!input || input.disabled || configuredFormats.has(input)) return;
       configuredFormats.add(input);if (!input.checked) input.click();
     };
-    defaultFormat('寄件單','C2C_SHIPPING_LABEL_THERMAL');
+    if(!selectedOrders().some(order=>/7-ELEVEN/i.test(order.summary)))defaultFormat('寄件單','C2C_SHIPPING_LABEL_THERMAL');
     defaultFormat('裝箱單','PACKING_LIST_PDF');
     renderMode();
   }
@@ -436,6 +442,13 @@
         task.mergeTimer=window.setTimeout(()=>mergeNativeDocuments(task),600);
       }
       return;
+    }
+    if(message.type==='PREVIEW_SEVEN_LABELS'){
+      const task=activeTask;if(!task?.sevenEleven || task.cancelled || task.failed || task.combinedUrl || message.taskId!==task.id || task.sevenLabels){sendResponse?.({ok:false});return;}
+      try{globalThis.LHSevenEleven.validateLabels(message.labels,task.orders.map(order=>order.orderId));task.sevenLabels=message.labels;sendResponse?.({ok:true});}
+      catch(error){sendResponse?.({ok:false});failTask(task,`7-ELEVEN 文件讀取失敗：${error.message}`,error);return;}
+      task.detail='7-ELEVEN 寄件單已取得，正在核對装箱單…';renderTasks();
+      window.clearTimeout(task.mergeTimer);task.mergeTimer=window.setTimeout(()=>mergeNativeDocuments(task),600);return;
     }
     if (message.type === 'PREVIEW_URL') return; // Ignore notifications from an older worker.
     const existing = document.getElementById(PANEL_ID);
