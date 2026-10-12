@@ -1,6 +1,7 @@
 (function(root){
   const LABEL_PATH='/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx';
   function isLabelUrl(value){try{const u=new URL(value);return u.origin==='https://epayment.7-11.com.tw' && u.pathname===LABEL_PATH;}catch{return false;}}
+  function isLaunchUrl(value){try{const u=new URL(value);return isLabelUrl(value) || (u.origin==='https://sellerfulfilment-shipment-sea.cache.susercontent.com' && /^\/sd-[a-z0-9-]+\/[A-Za-z0-9_-]+--html_c2c_shipping_label_redirect\.html$/.test(u.pathname));}catch{return false;}}
   function validateLabels(labels,orderIds){
     if(!Array.isArray(labels) || !labels.length || labels.length>100 || labels.length!==orderIds.length || new Set(orderIds).size!==orderIds.length)throw new Error('7-ELEVEN 寄件單與已選訂單數量不符');
     let bytes=0;
@@ -25,6 +26,6 @@
     page.scaleContent(.8,.8);page.translateContent(0,paper[1]*.2);
     return page;
   }
-  root.LHSevenEleven={isLabelUrl,validateLabels,appendLabel};
+  root.LHSevenEleven={isLabelUrl,isLaunchUrl,validateLabels,appendLabel};
   if(typeof module!=='undefined')module.exports=root.LHSevenEleven;
 })(globalThis);

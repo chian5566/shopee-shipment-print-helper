@@ -17,7 +17,10 @@
     const taskId=document.documentElement.getAttribute('data-lh-background-task');
     let target;
     try { target=new URL(String(url),location.href); } catch (_) {}
-    const isSeven=target?.origin==='https://epayment.7-11.com.tw' && target.pathname==='/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx';
+    // Shopee opens a CDN HTML redirect first; opening only the final 7-ELEVEN
+    // URL in the background is too late to prevent the native popup stealing focus.
+    const isSeven=(target?.origin==='https://epayment.7-11.com.tw' && target.pathname==='/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx') ||
+      (target?.origin==='https://sellerfulfilment-shipment-sea.cache.susercontent.com' && /^\/sd-[a-z0-9-]+\/[A-Za-z0-9_-]+--html_c2c_shipping_label_redirect\.html$/.test(target.pathname));
     if(taskId && document.documentElement.getAttribute('data-lh-seven-background-task')===taskId && isSeven){
       window.postMessage({source:'lh-print',type:'BACKGROUND_SEVEN_PREVIEW',taskId,url:target.href},'*');
       return null;

@@ -123,7 +123,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     }
     if(!task || task.taskId!==message.taskId || Date.now()>task.until){sendResponse({ok:false});return;}
     if(message.type==='OPEN_BACKGROUND_SEVEN_PREVIEW'){
-      if(!task.sevenEleven || !sevenUrl(message.url)){sendResponse({ok:false});return;}
+      if(!task.sevenEleven || !globalThis.LHSevenEleven.isLaunchUrl(message.url)){sendResponse({ok:false});return;}
       if(task.openedSevenUrls.has(message.url)){sendResponse({ok:true});return;}
       if(task.openedSevenUrls.size>=2){sendResponse({ok:false});return;}
       task.openedSevenUrls.add(message.url);
