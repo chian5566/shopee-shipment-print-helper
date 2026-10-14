@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.10.0';
+  const VERSION = '0.11.0';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -385,7 +385,8 @@
     panel.innerHTML = `<div class="lh-head">LEISURE HOMME 出貨印單助手 <small>v${VERSION}</small> <button class="lh-close" title="關閉">×</button></div>
       <div class="lh-body"><p class="lh-section-title"><span class="lh-count">已選 0 個訂單</span></p><div class="lh-orders"></div>
       <div class="lh-mode-hint lh-warning" role="status" hidden></div>
-      <hr><div class="lh-task-heading"><p class="lh-section-title">列印任務</p><button class="lh-clear-tasks" type="button">清除所有任務</button></div><div class="lh-tasks"></div></div>`;
+      <hr><div class="lh-task-heading"><p class="lh-section-title">列印任務</p><button class="lh-clear-tasks" type="button">清除所有任務</button></div><div class="lh-tasks"></div></div>
+      <footer class="lh-footer"><div class="lh-footer-author">此工具由 <a href="https://www.threads.com/@chian5566" target="_blank" rel="noopener noreferrer">chian5566</a> 無償提供和維護<br><a href="https://shopee.tw/shop/1853603/" target="_blank" rel="noopener noreferrer">買件衣服來贊助作者！</a></div><a class="lh-footer-report" href="${REPORT_URL}" target="_blank" rel="noopener noreferrer">問題回報 ↗</a></footer>`;
     document.documentElement.append(panel);
     document.querySelector('#app')?.classList.add('lh-page-pushed');
     refreshPageLayout();
@@ -426,8 +427,10 @@
     if (message.type === 'GET_PAGE_STATUS') {
       sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
     }
-    if (message.type === 'OPEN_PANEL') {
-      if (!document.getElementById(PANEL_ID)) makePanel();
+    if (message.type === 'OPEN_PANEL' || message.type === 'TOGGLE_PANEL') {
+      const existing = document.getElementById(PANEL_ID);
+      if (message.type === 'TOGGLE_PANEL' && existing) closePanel();
+      else if (!existing) makePanel();
       else renderMode();
       sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
     }
@@ -458,10 +461,6 @@
       window.clearTimeout(task.mergeTimer);task.mergeTimer=window.setTimeout(()=>mergeNativeDocuments(task),600);return;
     }
     if (message.type === 'PREVIEW_URL') return; // Ignore notifications from an older worker.
-    const existing = document.getElementById(PANEL_ID);
-    if (message.type !== 'TOGGLE_PANEL') return;
-    else if (existing) closePanel();
-    else makePanel();
   });
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);

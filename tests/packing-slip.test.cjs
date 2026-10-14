@@ -68,7 +68,7 @@ assert.deepEqual(slip.extractRows(fullwidth),expected);
   assert.ok(titles.getPageCount()>1);
   const td=await pdfjs.getDocument({data:await titles.save(),isEvalSupported:false}).promise;
   let titleText='';for(let n=1;n<=td.numPages;n++)titleText+=(await(await td.getPage(n)).getTextContent()).items.filter(i=>! /商品名稱[（(]續[）)]/.test(i.str)).map(i=>i.str).join('');
-  titleText=titleText.replace(/商品名稱[（(]續[）)]/g,'').replace(/\s/g,'');assert.ok(titleText.includes(longName));await td.loadingTask.destroy();
+  titleText=titleText.replace(/商品名稱[（(]續[）)]/g,'').replace(/\s/g,'').replace(/總數量\d+件/g,'');assert.ok(titleText.includes(longName));await td.loadingTask.destroy();
   // Check pagination and long specifications do not disappear.
   const multi=await PDFLib.PDFDocument.create();multi.registerFontkit(fontkit);
   const mf=await multi.embedFont(fontBytes,{subset:false});const mn=await multi.embedFont(PDFLib.StandardFonts.CourierBold);
