@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.10.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 物流支援
 
@@ -22,7 +22,7 @@
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.10.0/shopee-shipment-print-helper-v0.10.0.zip" target="_blank" rel="noopener noreferrer">下載 v0.10.0 安裝檔</a>（`shopee-shipment-print-helper-v0.10.0.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.0/shopee-shipment-print-helper-v0.11.0.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.0 安裝檔</a>（`shopee-shipment-print-helper-v0.11.0.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
@@ -32,7 +32,7 @@
 ## 使用
 
 1. 前往蝦皮 <a href="https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301" target="_blank" rel="noopener noreferrer">批次出貨 → 下載出貨文件</a>。
-2. 點「印」字圖示開啟助手，確認要出貨的訂單（助手會先選取目前頁面的訂單）。
+2. 點「印」字圖示開啟助手，再點一次可關閉；確認要出貨的訂單（助手會先選取目前頁面的訂單）。
 3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」（7-ELEVEN 使用原生服務單，不需選此格式）。
 4. 按蝦皮的「下載所選文件」。
 5. 助手顯示「文件已完成，可預覽」後，按「預覽文件」，再從預覽視窗列印。
