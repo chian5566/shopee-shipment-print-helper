@@ -9,8 +9,8 @@ test('actual two-section PDF with a joined size/quantity retains all six rows',(
   const sections=slip.extractPackingSections(fixture);
   assert.deepEqual(sections.map(p=>p.orderId),['250101TEST0001','250101TEST0002']);
   assert.deepEqual(sections.map(p=>p.rows.map(r=>[r.sku,r.variantSku,r.spec,r.qty])),[
-    [['PT14','PT14_BLK_M','黑色(俐落收斂 / 第一次買選它) / M (約 30~31 腰)',1],['TS12','TS12_CRM_L','奶油白(乾淨提亮) / L',1]],
-    [['TS12','TS12_CRM_M','奶油白(乾淨提亮) / M',1],['TS12','TS12_BLK_M','黑色(顯瘦耐穿) / M',1],['TS13','TS13_RDS_M','酒紅(高質感顏色!最推薦) / M',1],['TS13','TS13_WHT_M','白色(給人溫暖的顏色) / M',1]]
+    [['PT14','PT14_BLK_M','黑色(俐落收斂 / 第一次買選它) / M (約 30~31 腰)',1],['','TS12_CRM_L','奶油白(乾淨提亮) / L',1]],
+    [['','TS12_CRM_M','奶油白(乾淨提亮) / M',1],['','TS12_BLK_M','黑色(顯瘦耐穿) / M',1],['TS13','TS13_RDS_M','酒紅(高質感顏色!最推薦) / M',1],['TS13','TS13_WHT_M','白色(給人溫暖的顏色) / M',1]]
   ]);
 });
 
@@ -32,5 +32,15 @@ test('uncertain geometry, font, baseline, and duplicate quantities still stop',(
   ]) {
     const items=copy();mutate(items,joined(items));
     assert.throws(()=>slip.extractPackingSections(items),/不完整/);
+  }
+});
+
+// Product specification text belongs to the seller; geometry identifies quantity.
+test('joined quantities support arbitrary seller specifications',()=>{
+  for(const spec of ['加大尺寸','鞋碼42','abc','規格#★']) {
+    const items=copy(),i=joined(items);
+    i.str=spec+' 1';
+    const row=slip.extractPackingSections(items)[1].rows[1];
+    assert.equal(row.qty,1);assert.ok(row.spec.endsWith(spec));
   }
 });
