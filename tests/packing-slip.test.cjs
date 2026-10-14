@@ -17,8 +17,8 @@ const variantExpected=expected.map((r,i)=>({...r,variantSku:['TS13_NVY_L','PT03_
 assert.deepEqual(slip.extractRows(withVariant),variantExpected);
 const wrappedVariant=withVariant.filter(i=>i.str!=='TS13_NVY_L');wrappedVariant.push(item('TS13_',280,700),item('NVY_L',280,680));
 assert.deepEqual(slip.extractRows(wrappedVariant),variantExpected);
-assert.throws(()=>slip.extractRows(items.filter(i=>i.str!=='數量')),/無法辨識/);
-assert.throws(()=>slip.extractRows(items.filter(i=>!(i.transform[4]===540 && i.transform[5]===700))),/不完整/);
+assert.equal(slip.extractRows(items.filter(i=>i.transform[4]!==540))[0].qty,null);
+assert.equal(slip.extractRows(items.filter(i=>!(i.transform[4]===540 && i.transform[5]===700)))[0].qty,null);
 const wrapped=items.filter(i=>!(i.transform[4]===370 && i.transform[5]===700));wrapped.push(item('藏青色',370,700),item('/ L',370,680));
 assert.equal(slip.extractRows(wrapped)[0].spec,'藏青色 / L');
 assert.throws(()=>slip.extractRows([...items,item('abc',545,685)]),/不完整/);

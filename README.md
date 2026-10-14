@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.11.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.1**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 物流支援
 
@@ -22,12 +22,16 @@
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.0/shopee-shipment-print-helper-v0.11.0.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.0 安裝檔</a>（`shopee-shipment-print-helper-v0.11.0.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.1/shopee-shipment-print-helper-v0.11.1.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.1 安裝檔</a>（`shopee-shipment-print-helper-v0.11.1.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
 
 更新時，換成新版檔案，到同一個擴充功能頁面按助手的重新載入按鈕，再重新整理蝦皮頁面。
+
+## 設計原則
+
+本工具開放給所有蝦皮賣家使用。商品貨號、規格、顏色、尺寸與名稱均視為賣家自訂文字，不以 LEISURE HOMME 的商品編碼或品類推算資料。商品列、數量與訂單配對依蝦皮文件的欄位、座標及原始識別資訊處理；品牌名稱與作者贊助連結僅供顯示，不參與資料判斷。
 
 ## 使用
 
@@ -49,7 +53,9 @@
 
 表單須登入 Google；上傳並提交附件時，Google 會記錄帳戶名稱、信箱與相片。截圖、影片請先遮住買家姓名、電話、地址等個資。
 
-目前仍在測試，部分店家的商品貨號或物流格式可能不適用。第一次使用請少量試印，確認訂單與商品內容。
+商品貨號與商品選項貨號依賣家原文保留，不限制店家編碼格式，也不從選項貨號推算主貨號。商品名稱、主貨號、商品選項貨號及規格可空白或缺欄，空白貨號與規格顯示「—」。數量空白或缺欄時顯示「—」，總數量標示「未提供」，不自行補成 1 件；無效或位置不明的數量仍會停止重排。
+
+目前仍在測試，第一次使用請少量試印，確認訂單、商品內容與列印尺寸。
 
 ## 其他說明
 
