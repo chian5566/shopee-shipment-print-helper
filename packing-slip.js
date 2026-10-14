@@ -7,7 +7,7 @@
   // Use PDF text coordinates to read columns, never infer quantities from product titles.
   function extractRows(items) {
     const text = items.filter(i => i.str?.trim()).map(i => ({
-      text: i.str.normalize('NFKC').trim(), x: i.transform[4], y: i.transform[5], width:i.width || 0,
+      text: i.str.trim(), x: i.transform[4], y: i.transform[5], width:i.width || 0,
       height: Math.abs(i.height || i.transform[3] || 10), fontName:i.fontName
     }));
     const lines = [];
@@ -30,22 +30,33 @@
       // retaining each complete source fragment's coordinate for column boundaries.
       const band = {items:text.filter(i=>Math.abs(i.y-line.y)<=Math.max(18,line.items[0].height*1.5))};
       const c = Object.fromEntries(Object.entries(names).map(([key,aliases])=>[key,find(band,aliases)]));
-      if (c.sku !== null && c.spec !== null && c.qty !== null) {
+      if (Object.values(c).filter(value=>value!==null).length>=2 && (c.index!==null || c.qty!==null)) {
         columns=c;
         const headerItems=band.items.filter(i=>Object.values(names).flat().some(alias=>alias.includes(compact(i.text))));
         header={y:Math.min(...headerItems.map(i=>i.y))};break;
       }
     }
-    if (!columns || !(columns.sku < columns.spec && columns.spec < columns.qty)) {
-      throw new Error('無法辨識裝箱單的貨號／規格／數量欄位，請提供原始裝箱單 PDF 以校正');
+    if (!columns) {
+      throw new Error('無法辨識裝箱單欄位，請提供原始裝箱單 PDF 以校正');
     }
     const footer = lines.filter(l => l.y < header.y && /買家備[註注]|賣家備[註注]|訂單備[註注]/.test(compact(l.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join('')))).sort((a,b)=>b.y-a.y)[0];
     const body = text.filter(i=>i.y<header.y-4 && (!footer || i.y>footer.y+3));
-    const hasIndex=columns.index!==null && columns.index<columns.sku;
-    const starts = body.filter(i=>hasIndex
-      ? i.x < columns.sku-4 && /^\d+[.)]?$/.test(compact(i.text))
-      : Math.abs(i.x-columns.sku)<12 && /^[A-Za-z][A-Za-z0-9_.-]*\d[A-Za-z0-9_.-]*$/.test(compact(i.text))
+    const positions=Object.values(columns).filter(value=>value!==null).sort((a,b)=>a-b);
+    const rightOf=left=>positions.find(value=>value>left) ?? Infinity;
+    const hasIndex=columns.index!==null && columns.index===positions[0] && body.some(i=>i.x>=columns.index-3 && i.x<rightOf(columns.index)-3 && /^\d+[.)]?$/.test(compact(i.text)));
+    // Without a sequence column, use the leftmost populated product column.
+    // Ambiguous wrapped rows still fail quantity validation rather than disappear.
+    const anchor=['sku','variantSku','name','spec'].map(key=>columns[key]).filter(x=>x!==null && body.some(i=>Math.abs(i.x-x)<12)).sort((a,b)=>a-b)[0];
+    let starts = body.filter(i=>hasIndex
+      ? i.x>=columns.index-3 && i.x<rightOf(columns.index)-3 && /^\d+[.)]?$/.test(compact(i.text))
+      : anchor!==undefined && Math.abs(i.x-anchor)<12
     ).sort((a,b)=>b.y-a.y);
+    if (!hasIndex) {
+      for (const i of body.filter(i=>columns.qty!==null && i.x>=columns.qty-3 && i.x<rightOf(columns.qty)-3)) {
+        if (!starts.some(start=>Math.abs(start.y-i.y)<3)) starts.push(i);
+      }
+      starts=starts.sort((a,b)=>b.y-a.y).filter((start,index,list)=>index===0 || Math.abs(start.y-list[index-1].y)>=3);
+    }
     if (!starts.length) throw new Error('裝箱單未找到商品列，已停止產生');
     const rows = starts.map((start,index) => {
       if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) throw new Error('裝箱單商品序號不連續，無法安全重排');
@@ -55,7 +66,7 @@
         // Split only when measured same-font digit widths place the final token
         // exactly at the quantity column on this row's first baseline.
         const match=i.text.match(/^([,，]\s*[A-Z0-9]+)\s+(\d+)$/i);
-        if (!match || !i.fontName || i.x<columns.spec-3 || i.x>=columns.qty-3 || Math.abs(i.y-start.y)>=3) return [i];
+        if (columns.spec===null || columns.qty===null || !match || !i.fontName || i.x<columns.spec-3 || i.x>=columns.qty-3 || Math.abs(i.y-start.y)>=3) return [i];
         const widths=body.filter(t=>t.fontName===i.fontName && Math.abs(t.height-i.height)<.01 && /^\d+$/.test(t.text) && t.width>0).map(t=>t.width/t.text.length);
         if (!widths.length || Math.max(...widths)-Math.min(...widths)>.01) return [i];
         const qtyWidth=widths[0]*match[2].length;
@@ -63,22 +74,20 @@
         if (Math.abs(qtyX-columns.qty)>.5 || qtyX+qtyWidth>(columns.total ?? Infinity)-3) return [i];
         return [{...i,text:match[1],width:qtyX-i.x},{...i,text:match[2],x:qtyX,width:qtyWidth}];
       });
-      const field = (left,right) => group.filter(i=>i.x>=left-3 && i.x<right-3).sort((a,b)=>b.y-a.y || a.x-b.x).map(i=>i.text).join(' ').trim();
-      let sku=field(columns.sku,columns.name ?? columns.variantSku ?? columns.spec);
-      const variantSku=columns.variantSku === null ? '' : compact(field(columns.variantSku,columns.spec));
-      // Shopee permits an empty parent SKU. Only use the explicit variant SKU's
-      // established LEISURE HOMME prefix; never infer it from a product title.
-      if (!sku && columns.variantSku !== null) {
-        sku=variantSku.match(/^([A-Z]{2}\d{2})_[A-Z0-9]+_[A-Z0-9]+$/i)?.[1] || '';
+      const field = (left,joiner=' ') => left===null ? '' : group.filter(i=>i.x>=left-3 && i.x<rightOf(left)-3).sort((a,b)=>b.y-a.y || a.x-b.x).map(i=>i.text).join(joiner).trim();
+      // Seller-defined identifiers are opaque text. Never derive a parent SKU.
+      const sku=field(columns.sku);
+      const variantSku=field(columns.variantSku,'');
+      const spec=field(columns.spec).normalize('NFKC').replace(/([\u3400-\u9fff!！])\s+(?=[\u3400-\u9fff])/g,'$1').replace(/\s*([,，])\s*/g,' / ');
+      const qtyItems=columns.qty===null ? [] : group.filter(i=>i.x>=columns.qty-3 && i.x<rightOf(columns.qty)-3);
+      if (columns.qty!==null && qtyItems.length===0 && group.some(i=>/^([,，]\s*[A-Z0-9]+)\s+(\d+)$/i.test(i.text))) throw new Error(`第 ${index+1} 列數量不完整或位置不明，已停止產生`);
+      const qty=qtyItems.length===0 ? null : qtyItems.length===1 ? Number(compact(qtyItems[0].text)) : NaN;
+      if (qty!==null && (qtyItems.length!==1 || !/^\d+$/.test(compact(qtyItems[0].text)) || !Number.isSafeInteger(qty) || qty<1)) {
+        throw new Error(`第 ${index+1} 列數量不完整或無效，已停止產生`);
       }
-      const spec=field(columns.spec,columns.qty).replace(/([\u3400-\u9fff!！])\s+(?=[\u3400-\u9fff])/g,'$1').replace(/\s*([,，])\s*/g,' / ');
-      const qtyItems=group.filter(i=>i.x>=columns.qty-3 && i.x<(columns.total ?? Infinity)-3);
-      const qty=qtyItems.length===1 ? compact(qtyItems[0].text) : '';
-      if (!/^[A-Za-z0-9][A-Za-z0-9_. /-]*$/.test(sku) || !spec || !/^\d+$/.test(qty) || Number(qty)<1 || !Number.isSafeInteger(Number(qty))) {
-        throw new Error(`第 ${index+1} 列貨號、規格或數量不完整，已停止產生`);
-      }
-      const name=columns.name === null ? '' : field(columns.name,columns.variantSku ?? columns.spec).replace(/([\u3400-\u9fff])\s+(?=[\u3400-\u9fff])/g,'$1');
-      return {sku,variantSku,name,spec,qty:Number(qty)};
+      if (!hasIndex && qty===null && starts.length>1) throw new Error(`第 ${index+1} 列數量不完整且商品列邊界不明，已停止產生`);
+      const name=field(columns.name).normalize('NFKC').replace(/([\u3400-\u9fff])\s+(?=[\u3400-\u9fff])/g,'$1');
+      return {sku,variantSku,name,spec,qty};
     });
     return rows;
   }
@@ -179,10 +188,11 @@
   async function appendRows(out, rows, fonts, PDFLib, buyerNote = '', orderId = '') {
     if (!rows.length) throw new Error('裝箱單沒有商品');
     if(orderId && !/^\d{6}[A-Z0-9]{6,20}$/i.test(orderId))throw new Error('裝箱單訂單編號無效');
-    let totalQty=0;
+    let totalQty=0, hasUnknownQty=false;
     for (const row of rows) {
-      if (!row.sku || !row.spec || !Number.isSafeInteger(row.qty) || row.qty<1) throw new Error('裝箱單商品資料無效');
-      totalQty+=row.qty;
+      if (row.qty!==null && (!Number.isSafeInteger(row.qty) || row.qty<1)) throw new Error('裝箱單商品資料無效');
+      hasUnknownQty ||= row.qty===null;
+      totalQty+=row.qty ?? 0;
       if (!Number.isSafeInteger(totalQty)) throw new Error('裝箱單總數量無效');
     }
     // The selected thermal printer stock is 100 x 150 mm. Source label PDFs
@@ -201,7 +211,7 @@
     let page,y;
     const newPage = (showColumns = true) => {
       page=out.addPage(paper);
-      const totalText=`總數量 ${totalQty} 件`,totalSize=8.5;
+      const totalText=`總數量 ${hasUnknownQty ? '未提供' : totalQty+' 件'}`,totalSize=8.5;
       const totalX=x(248)-font.widthOfTextAtSize(totalText,totalSize);
       if(orderId) {
         page.drawText('訂單編號',{x:x(37),y:390+topOffset,size:8.5,font});
@@ -220,8 +230,10 @@
     };
     newPage();
     for (const row of rows) {
-      if (!row.sku || !row.spec || !Number.isSafeInteger(row.qty) || row.qty<1) throw new Error('裝箱單商品資料無效');
-      const skuLines=wrap(row.sku,numberFont,11,32*columnScale), variantSkuLines=wrap(row.variantSku || '—',row.variantSku ? numberFont : font,9,78*columnScale), specLines=wrap(row.spec,font,10,52*columnScale);
+      if (row.qty!==null && (!Number.isSafeInteger(row.qty) || row.qty<1)) throw new Error('裝箱單商品資料無效');
+      const identifierFont=value=>value && /^[\x20-\x7e]+$/.test(value) ? numberFont : font;
+      const skuFont=identifierFont(row.sku),variantFont=identifierFont(row.variantSku);
+      const skuLines=wrap(row.sku || '—',skuFont,11,32*columnScale), variantSkuLines=wrap(row.variantSku || '—',variantFont,9,78*columnScale), specLines=wrap(row.spec || '—',font,10,52*columnScale);
       const lineHeight=11;
       const height=Math.max(32,Math.max(skuLines.length,variantSkuLines.length,specLines.length)*lineHeight+10);
       if (height>270) throw new Error('規格內容過長，請人工核對原始裝箱單');
@@ -231,18 +243,18 @@
       // Keep ordinary items together; exceptionally long names may continue.
       const available=337+topOffset-(margin+30);
       if (y-Math.min(totalHeight,available)<margin+30) newPage();
-      skuLines.forEach((line,n)=>page.drawText(line,{x:x(37),y:y-13-n*lineHeight,size:11,font:numberFont}));
-      variantSkuLines.forEach((line,n)=>page.drawText(line,{x:x(76),y:y-13-n*lineHeight,size:9,font:row.variantSku ? numberFont : font}));
+      skuLines.forEach((line,n)=>page.drawText(line,{x:x(37),y:y-13-n*lineHeight,size:11,font:skuFont}));
+      variantSkuLines.forEach((line,n)=>page.drawText(line,{x:x(76),y:y-13-n*lineHeight,size:9,font:variantFont}));
       specLines.forEach((line,n)=>page.drawText(line,{x:x(164),y:y-13-n*lineHeight,size:10,font}));
-      const qty=String(row.qty);const size=Math.min(18,29/numberFont.widthOfTextAtSize(qty,1));
-      page.drawText(qty,{x:x(234)-numberFont.widthOfTextAtSize(qty,size)/2,y:y-21,size,font:numberFont});
+      const qty=row.qty===null ? '—' : String(row.qty),qtyFont=row.qty===null ? font : numberFont;const size=Math.min(18,29/qtyFont.widthOfTextAtSize(qty,1));
+      page.drawText(qty,{x:x(234)-qtyFont.widthOfTextAtSize(qty,size)/2,y:y-21,size,font:qtyFont});
       y-=height;
       if (titleLines.length) {
         y-=2;
         for (const line of titleLines) {
           if (y<margin+7.5) {
             newPage(false);
-            page.drawText(`${row.sku}｜商品名稱（續）`,{x:x(37),y,size:8,font});y-=14;
+            page.drawText(`${row.sku || '—'}｜商品名稱（續）`,{x:x(37),y,size:8,font});y-=14;
           }
           page.drawText(line,{x:x(37),y,size:7.5,font});y-=titleLineHeight;
         }
