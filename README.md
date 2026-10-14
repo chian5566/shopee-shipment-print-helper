@@ -29,6 +29,10 @@
 
 更新時，換成新版檔案，到同一個擴充功能頁面按助手的重新載入按鈕，再重新整理蝦皮頁面。
 
+## 設計原則
+
+本工具開放給所有蝦皮賣家使用。商品貨號、規格、顏色、尺寸與名稱均視為賣家自訂文字，不以 LEISURE HOMME 的商品編碼或品類推算資料。商品列、數量與訂單配對依蝦皮文件的欄位、座標及原始識別資訊處理；品牌名稱與作者贊助連結僅供顯示，不參與資料判斷。
+
 ## 使用
 
 1. 前往蝦皮 <a href="https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301" target="_blank" rel="noopener noreferrer">批次出貨 → 下載出貨文件</a>。

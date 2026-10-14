@@ -34,3 +34,13 @@ test('uncertain geometry, font, baseline, and duplicate quantities still stop',(
     assert.throws(()=>slip.extractPackingSections(items),/不完整/);
   }
 });
+
+// Product specification text belongs to the seller; geometry identifies quantity.
+test('joined quantities support arbitrary seller specifications',()=>{
+  for(const spec of ['加大尺寸','鞋碼42','abc','規格#★']) {
+    const items=copy(),i=joined(items);
+    i.str=spec+' 1';
+    const row=slip.extractPackingSections(items)[1].rows[1];
+    assert.equal(row.qty,1);assert.ok(row.spec.endsWith(spec));
+  }
+});

@@ -62,10 +62,10 @@
       if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) throw new Error('裝箱單商品序號不連續，無法安全重排');
       const bottom = starts[index+1]?.y ?? (footer ? footer.y+3 : -Infinity);
       const group = body.filter(i=>i.y<=start.y+3 && i.y>bottom+3).flatMap(i=>{
-        // PDF.js can combine a size suffix and the adjacent quantity (",M 1").
+        // PDF.js can combine arbitrary specification text and the adjacent quantity.
         // Split only when measured same-font digit widths place the final token
         // exactly at the quantity column on this row's first baseline.
-        const match=i.text.match(/^([,，]\s*[A-Z0-9]+)\s+(\d+)$/i);
+        const match=i.text.match(/^(.+?)\s+(\d+)$/u);
         if (columns.spec===null || columns.qty===null || !match || !i.fontName || i.x<columns.spec-3 || i.x>=columns.qty-3 || Math.abs(i.y-start.y)>=3) return [i];
         const widths=body.filter(t=>t.fontName===i.fontName && Math.abs(t.height-i.height)<.01 && /^\d+$/.test(t.text) && t.width>0).map(t=>t.width/t.text.length);
         if (!widths.length || Math.max(...widths)-Math.min(...widths)>.01) return [i];
@@ -80,7 +80,7 @@
       const variantSku=field(columns.variantSku,'');
       const spec=field(columns.spec).normalize('NFKC').replace(/([\u3400-\u9fff!！])\s+(?=[\u3400-\u9fff])/g,'$1').replace(/\s*([,，])\s*/g,' / ');
       const qtyItems=columns.qty===null ? [] : group.filter(i=>i.x>=columns.qty-3 && i.x<rightOf(columns.qty)-3);
-      if (columns.qty!==null && qtyItems.length===0 && group.some(i=>/^([,，]\s*[A-Z0-9]+)\s+(\d+)$/i.test(i.text))) throw new Error(`第 ${index+1} 列數量不完整或位置不明，已停止產生`);
+      if (columns.qty!==null && qtyItems.length===0 && group.some(i=>columns.spec!==null && i.x>=columns.spec-3 && i.x<rightOf(columns.spec)-3 && /^(.+?)\s+(\d+)$/u.test(i.text))) throw new Error(`第 ${index+1} 列數量不完整或位置不明，已停止產生`);
       const qty=qtyItems.length===0 ? null : qtyItems.length===1 ? Number(compact(qtyItems[0].text)) : NaN;
       if (qty!==null && (qtyItems.length!==1 || !/^\d+$/.test(compact(qtyItems[0].text)) || !Number.isSafeInteger(qty) || qty<1)) {
         throw new Error(`第 ${index+1} 列數量不完整或無效，已停止產生`);
