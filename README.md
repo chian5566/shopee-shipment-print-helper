@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.11.0**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.1**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 物流支援
 
@@ -22,7 +22,7 @@
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.0/shopee-shipment-print-helper-v0.11.0.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.0 安裝檔</a>（`shopee-shipment-print-helper-v0.11.0.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.1/shopee-shipment-print-helper-v0.11.1.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.1 安裝檔</a>（`shopee-shipment-print-helper-v0.11.1.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
