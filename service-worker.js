@@ -59,14 +59,14 @@ chrome.action.onClicked.addListener(async tab=>{
     chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});return;
   }
   try {
-    await chrome.tabs.sendMessage(tab.id,{type:'OPEN_PANEL'});
+    await chrome.tabs.sendMessage(tab.id,{type:'TOGGLE_PANEL'});
   } catch (_) {
     try {
       // Recover old tabs without showing an extra menu or refreshing Shopee.
       await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',files:['network-hook.js']});
       await chrome.scripting.insertCSS({target:{tabId:tab.id},files:['panel.css']});
       await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','print-layout.js','packing-slip.js','seven-eleven.js','content.js']});
-      await chrome.tabs.sendMessage(tab.id,{type:'OPEN_PANEL'});
+      await chrome.tabs.sendMessage(tab.id,{type:'TOGGLE_PANEL'});
     } catch (_) {
       chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});
     }

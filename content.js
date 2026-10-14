@@ -427,8 +427,10 @@
     if (message.type === 'GET_PAGE_STATUS') {
       sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
     }
-    if (message.type === 'OPEN_PANEL') {
-      if (!document.getElementById(PANEL_ID)) makePanel();
+    if (message.type === 'OPEN_PANEL' || message.type === 'TOGGLE_PANEL') {
+      const existing = document.getElementById(PANEL_ID);
+      if (message.type === 'TOGGLE_PANEL' && existing) closePanel();
+      else if (!existing) makePanel();
       else renderMode();
       sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
     }
@@ -459,10 +461,6 @@
       window.clearTimeout(task.mergeTimer);task.mergeTimer=window.setTimeout(()=>mergeNativeDocuments(task),600);return;
     }
     if (message.type === 'PREVIEW_URL') return; // Ignore notifications from an older worker.
-    const existing = document.getElementById(PANEL_ID);
-    if (message.type !== 'TOGGLE_PANEL') return;
-    else if (existing) closePanel();
-    else makePanel();
   });
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);
