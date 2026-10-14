@@ -179,6 +179,12 @@
   async function appendRows(out, rows, fonts, PDFLib, buyerNote = '', orderId = '') {
     if (!rows.length) throw new Error('裝箱單沒有商品');
     if(orderId && !/^\d{6}[A-Z0-9]{6,20}$/i.test(orderId))throw new Error('裝箱單訂單編號無效');
+    let totalQty=0;
+    for (const row of rows) {
+      if (!row.sku || !row.spec || !Number.isSafeInteger(row.qty) || row.qty<1) throw new Error('裝箱單商品資料無效');
+      totalQty+=row.qty;
+      if (!Number.isSafeInteger(totalQty)) throw new Error('裝箱單總數量無效');
+    }
     // The selected thermal printer stock is 100 x 150 mm. Source label PDFs
     // can use different page/crop sizes; do not let those expand the packing sheet.
     const paper=PAPER;
@@ -195,10 +201,14 @@
     let page,y;
     const newPage = (showColumns = true) => {
       page=out.addPage(paper);
+      const totalText=`總數量 ${totalQty} 件`,totalSize=8.5;
+      const totalX=x(248)-font.widthOfTextAtSize(totalText,totalSize);
       if(orderId) {
         page.drawText('訂單編號',{x:x(37),y:390+topOffset,size:8.5,font});
-        page.drawText(orderId,{x:x(78),y:390+topOffset,size:9,font:numberFont});
+        const orderSize=Math.min(9,(totalX-x(78)-8)/numberFont.widthOfTextAtSize(orderId,1));
+        page.drawText(orderId,{x:x(78),y:390+topOffset,size:orderSize,font:numberFont});
       }
+      page.drawText(totalText,{x:totalX,y:390+topOffset,size:totalSize,font});
       if (!showColumns) { y=370+topOffset; return; }
       page.drawText('貨號',{x:x(37),y:359+topOffset,size:10,font});
       page.drawText('商品選項',{x:x(76),y:365+topOffset,size:9,font});
@@ -212,16 +222,18 @@
     for (const row of rows) {
       if (!row.sku || !row.spec || !Number.isSafeInteger(row.qty) || row.qty<1) throw new Error('裝箱單商品資料無效');
       const skuLines=wrap(row.sku,numberFont,11,32*columnScale), variantSkuLines=wrap(row.variantSku || '—',row.variantSku ? numberFont : font,9,78*columnScale), specLines=wrap(row.spec,font,10,52*columnScale);
-      const height=Math.max(47,Math.max(skuLines.length,variantSkuLines.length,specLines.length)*13+20);
+      const lineHeight=11;
+      const height=Math.max(32,Math.max(skuLines.length,variantSkuLines.length,specLines.length)*lineHeight+10);
       if (height>270) throw new Error('規格內容過長，請人工核對原始裝箱單');
       const titleLines=row.name?.trim() ? wrap(row.name,font,7.5,contentWidth-8) : [];
-      const totalHeight=height+(titleLines.length ? titleLines.length*11+6 : 0);
+      const titleLineHeight=9.5;
+      const totalHeight=height+(titleLines.length ? titleLines.length*titleLineHeight+6 : 0);
       // Keep ordinary items together; exceptionally long names may continue.
       const available=337+topOffset-(margin+30);
       if (y-Math.min(totalHeight,available)<margin+30) newPage();
-      skuLines.forEach((line,n)=>page.drawText(line,{x:x(37),y:y-16-n*13,size:11,font:numberFont}));
-      variantSkuLines.forEach((line,n)=>page.drawText(line,{x:x(76),y:y-16-n*13,size:9,font:row.variantSku ? numberFont : font}));
-      specLines.forEach((line,n)=>page.drawText(line,{x:x(164),y:y-16-n*13,size:10,font}));
+      skuLines.forEach((line,n)=>page.drawText(line,{x:x(37),y:y-13-n*lineHeight,size:11,font:numberFont}));
+      variantSkuLines.forEach((line,n)=>page.drawText(line,{x:x(76),y:y-13-n*lineHeight,size:9,font:row.variantSku ? numberFont : font}));
+      specLines.forEach((line,n)=>page.drawText(line,{x:x(164),y:y-13-n*lineHeight,size:10,font}));
       const qty=String(row.qty);const size=Math.min(18,29/numberFont.widthOfTextAtSize(qty,1));
       page.drawText(qty,{x:x(234)-numberFont.widthOfTextAtSize(qty,size)/2,y:y-21,size,font:numberFont});
       y-=height;
@@ -232,7 +244,7 @@
             newPage(false);
             page.drawText(`${row.sku}｜商品名稱（續）`,{x:x(37),y,size:8,font});y-=14;
           }
-          page.drawText(line,{x:x(37),y,size:7.5,font});y-=11;
+          page.drawText(line,{x:x(37),y,size:7.5,font});y-=titleLineHeight;
         }
         y-=4;
       }
