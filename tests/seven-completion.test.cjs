@@ -1,9 +1,9 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(require.resolve('../content.js'),'utf8');
-// Replace browser-only module loading; run the actual merge lifecycle with controlled I/O.
+// Run the actual merge lifecycle with controlled PDF I/O.
 const merge=source.slice(source.indexOf('  async function mergeNativeDocuments('),source.indexOf('  function refreshPageLayout('))
-.replace("const pdfjs = await import(chrome.runtime.getURL('vendor/pdf.min.mjs'));",'const pdfjs = fakePdfjs;')
-.replace("globalThis.pdfjsWorker ||= await import(chrome.runtime.getURL('vendor/pdf.worker.min.mjs'));",'globalThis.pdfjsWorker ||= {};');
+.replace('const pdfjs = globalThis.pdfjsLib;', 'const pdfjs = fakePdfjs;')
+.replace('if (!pdfjs?.getDocument || !globalThis.pdfjsWorker?.WorkerMessageHandler)', 'if (false)');
 const id='250101TEST0001';
 async function scenario(mode){
  const events=[];let release,started;const saving=new Promise(resolve=>started=resolve),held=new Promise((resolve,reject)=>release=mode==='failure'?reject:resolve);
