@@ -14,3 +14,5 @@
 Noto 字型來源：https://github.com/google/fonts/tree/main/ofl/notosanstc
 
 fontkit 原始授權聲明：https://github.com/Hopding/fontkit#license
+
+PDF.js 的 `pdf.classic.min.js` 與 `pdf.worker.classic.min.js` 由同目錄的官方 legacy `.mjs` 以鎖定版本 esbuild 轉成 IIFE；保留授權註記。執行 `npm run build:pdf` 可重建。此瀏覽器版本使用預載的 WorkerMessageHandler，沿用原有同執行緒解析方式。
