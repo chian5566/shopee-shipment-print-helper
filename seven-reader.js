@@ -20,9 +20,7 @@
         const frame=frames[i],node=frame.parentElement;
         const images=[...node.querySelectorAll('img')];
         if(images.length<2 || images.some(image=>!image.complete || !image.naturalWidth))return;
-        const rect=node.getBoundingClientRect();
-        const canvas=await globalThis.html2canvas(node,{scale:3,backgroundColor:'#ffffff',logging:false,allowTaint:false,useCORS:false});
-        labels.push({orderId:orderIds[i],png:canvas.toDataURL('image/png'),width:rect.width,height:rect.height});
+        labels.push(await globalThis.LHSevenEleven.captureLabel(node,orderIds[i],globalThis.html2canvas));
       }
       globalThis.LHSevenEleven.validateLabels(labels,task.orderIds);
       const result=await send({type:'SEVEN_LABELS_READY',taskId:task.taskId,labels});

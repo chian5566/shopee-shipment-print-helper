@@ -7,7 +7,7 @@ assert.ok(seven.isLabelUrl('https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrin
 assert.ok(!seven.isLabelUrl('https://example.com/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx'));
 assert.ok(!seven.isLabelUrl('http://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx'));
 seven.validateLabels(ids.map(label).reverse(),ids);
-for(const labels of [[label(ids[0])],[label(ids[0]),label(ids[0])],[label('250101TEST9999'),label(ids[1])],[{...label(ids[0]),width:500},label(ids[1])],[{...label(ids[0]),png:'https://example.com/image'},label(ids[1])]])assert.throws(()=>seven.validateLabels(labels,ids));
+for(const labels of [[label(ids[0])],[label(ids[0]),label(ids[0])],[label('250101TEST9999'),label(ids[1])],[{...label(ids[0]),width:3000},label(ids[1])],[{...label(ids[0]),png:'https://example.com/image'},label(ids[1])]])assert.throws(()=>seven.validateLabels(labels,ids));
 let handler,updated;let currentUrl;const forwarded=[],removed=[];
 const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},tabs:{onUpdated:{addListener(fn){updated=fn;}},get(id,cb){cb({id,url:currentUrl || url});},onRemoved:{addListener(){}},remove(id){removed.push(id);},sendMessage(id,msg,cb){forwarded.push({id,msg});cb({ok:true});}}};
 vm.runInNewContext(fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL,LHSevenEleven:seven});
