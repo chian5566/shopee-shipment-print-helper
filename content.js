@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.2';
+  const VERSION = '0.11.3';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -206,7 +206,8 @@
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
       receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
-      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0,
+      sevenLabelSizes:(task.sevenLabels || []).map((label,index)=>({label:index+1,width:label.width,height:label.height,sourceWidth:label.sourceWidth,sourceHeight:label.sourceHeight}))
     },null,2);
   }
 

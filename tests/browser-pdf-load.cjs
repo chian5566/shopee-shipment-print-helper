@@ -16,6 +16,8 @@ const { PDFDocument, StandardFonts } = require('pdf-lib');
       args: ['--no-sandbox', `--disable-extensions-except=${root}`, `--load-extension=${root}`],
       ignoreDefaultArgs: ['--disable-extensions'],
     });
+    context.setDefaultTimeout(20000);
+    context.setDefaultNavigationTimeout(20000);
     let moduleRequests = 0;
     await context.route('**/*', route => {
       if (/\.mjs(?:$|\?)/.test(route.request().url())) {
