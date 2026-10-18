@@ -127,3 +127,9 @@ assert.match(panel.querySelector('.lh-tasks').innerHTML,/新竹物流 寄件單�
 document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();native.click();
 assert.equal(panel.querySelector('.lh-tasks').innerHTML.match(/<b>(.*?)<\/b>/)[1],'寄件單＋裝箱單 × 2 筆');
 console.log('PASS: HCT task title includes carrier; mixed-carrier task title remains generic');
+// FamilyMart has no thermal radio; its image original plus packing PDF are supported.
+document.querySelectorAll=originalQueries;row.innerText='buyer 全家';thermal.checked=false;picklist.checked=false;tick();sent.length=0;native.click();
+const familyStart=sent.findLast(m=>m.type==='START_DOCUMENT_TASK');assert.ok(familyStart.familyMart);assert.equal(familyStart.sevenEleven,false);assert.equal(familyStart.expectedFiles,1);assert.match(panel.querySelector('.lh-tasks').innerHTML,/全家 寄件單/);
+picklist.checked=true;sent.length=0;native.click();assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').expectedFiles,2);
+document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();assert.match(panel.querySelector('.lh-mode-hint').textContent,/全家.*分開下載/);sent.length=0;native.click();assert.ok(!sent.some(m=>m.type==='START_DOCUMENT_TASK'));
+console.log('PASS: FamilyMart image mode, packing/picklist counts, mixed-carrier fallback');

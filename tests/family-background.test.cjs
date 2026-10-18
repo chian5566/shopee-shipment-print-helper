@@ -1,0 +1,22 @@
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
+let handler,updated;const forwarded=[],removed=[];
+const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},tabs:{onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(){}},sendMessage:(id,msg,cb)=>{forwarded.push({id,msg});cb?.({ok:true});},remove:(id,cb)=>{removed.push(id);cb?.();},get:(id,cb)=>cb({id,url:familyUrl})}};
+const familyUrl='https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo';
+const family=require('../familymart.js');vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL,LHFamilyMart:family});
+const source='https://seller.shopee.tw/portal/sale/mass/ship',ids=['250101TEST0001','250101TEST0002'];
+const send=(msg,id=7,url=source,openerTabId)=>{let reply;handler(msg,{tab:{id,url,openerTabId}},r=>reply=r);return reply;};
+const start=(id,taskId,extra={})=>send({type:'START_DOCUMENT_TASK',taskId,familyMart:true,orderIds:ids,...extra},id);
+assert.equal(start(7,'t',{sevenEleven:true}).ok,false);assert.equal(start(7,'t',{orderIds:[ids[0],ids[0]]}).ok,false);
+assert.equal(start(7,'t').ok,true);
+const get=(orderIds=ids,tab=20,url=familyUrl,opener=7)=>send({type:'GET_FAMILY_TASK',orderIds},tab,url,opener);
+assert.equal(get(ids,20,'https://evil.test').ok,false);assert.equal(get([ids[0]]).ok,false);assert.equal(get([ids[0],ids[0]]).ok,false);assert.equal(get(ids,20,familyUrl,8).ok,false);
+assert.equal(get().taskId,'t');
+const labels=ids.map(orderId=>({orderId,width:1308,height:2136,png:'data:image/png;base64,AAAA'}));
+const ready=(taskId='t',payload=labels,tab=20)=>send({type:'FAMILY_LABELS_READY',taskId,labels:payload},tab,familyUrl,7);
+assert.equal(ready('old').ok,false);assert.equal(ready('t',labels,21).ok,false);assert.equal(ready('t',[labels[0],labels[0]]).ok,false);
+assert.equal(ready().ok,true);assert.equal(ready().ok,false);assert.equal(forwarded[0].id,7);assert.equal(forwarded[0].msg.type,'PREVIEW_FAMILY_LABELS');assert.equal(removed.length,0);
+assert.equal(send({type:'COMPLETE_DOCUMENT_TASK',taskId:'old'}).ok,false);assert.equal(send({type:'COMPLETE_DOCUMENT_TASK',taskId:'t'}).ok,true);assert.deepEqual(removed,[20]);
+start(7,'a');start(8,'b');assert.equal(get(ids,21,familyUrl,null).ok,false);assert.equal(get(ids,21,familyUrl,7).taskId,'a');
+// A 7-ELEVEN task cannot accept FamilyMart labels.
+start(7,'seven',{familyMart:false,sevenEleven:true});assert.equal(get(ids,21,familyUrl,7).ok,false);
+console.log('PASS: FamilyMart exact-origin messages, stale IDs, complete order set, duplicate payload, opener isolation, ambiguous tasks, completion-only original cleanup');

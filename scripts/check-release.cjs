@@ -13,7 +13,7 @@ if(!development){
  assert.ok(readme.includes(`/releases/download/v${manifest.version}/shopee-shipment-print-helper-v${manifest.version}.zip`),'README must download the current release');
 }
 assert.deepEqual(manifest.permissions,['tabs','scripting']);
-assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx']);
+assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx','https://api.sls.shopee.tw/api/logistic/familymart/shipping_label*']);
 assert.equal(require('../package.json').license,'SEE LICENSE IN LICENSE.md');
 const required=new Set([...Object.values(manifest.icons),'LICENSE.md']);
 for(const script of manifest.content_scripts)for(const file of [...(script.js||[]),...(script.css||[])])required.add(file);

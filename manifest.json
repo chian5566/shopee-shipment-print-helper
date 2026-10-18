@@ -19,7 +19,8 @@
   ],
   "host_permissions": [
     "https://seller.shopee.tw/*",
-    "https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx"
+    "https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx",
+    "https://api.sls.shopee.tw/api/logistic/familymart/shipping_label*"
   ],
   "web_accessible_resources": [
     {
@@ -63,6 +64,7 @@
         "print-layout.js",
         "packing-slip.js",
         "seven-eleven.js",
+        "familymart.js",
         "content.js"
       ],
       "css": [
@@ -78,6 +80,17 @@
         "vendor/html2canvas.min.js",
         "seven-eleven.js",
         "seven-reader.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://api.sls.shopee.tw/api/logistic/familymart/shipping_label*"
+      ],
+      "js": [
+        "vendor/jsQR.js",
+        "familymart.js",
+        "familymart-reader.js"
       ],
       "run_at": "document_idle"
     }
