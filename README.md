@@ -1,5 +1,7 @@
 # LEISURE HOMME 出貨印單助手
 
+**此工具已上架 Chrome 線上應用程式商店，請直接前往[安裝](https://chromewebstore.google.com/detail/pallcldjfgojcnbcnkmcpibhfpnkkfgf)。**
+
 幫蝦皮賣家把同一筆訂單的寄件單與裝箱單排在一起，方便列印、包貨。
 
 **完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
