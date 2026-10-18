@@ -1,8 +1,8 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
-const opened=[],posted=[];let taskId='',sevenTaskId='';let resolveFetch;
+const opened=[],posted=[];let taskId='',sevenTaskId='',familyTaskId='';let resolveFetch;
 const window={open(...args){opened.push(args);return 'native';},postMessage:m=>posted.push(m),fetch:()=>new Promise(resolve=>resolveFetch=resolve)};
 function XMLHttpRequest(){};XMLHttpRequest.prototype.open=function(){};XMLHttpRequest.prototype.send=function(){};
-vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../network-hook.js'),'utf8'),{window,document:{documentElement:{getAttribute:name=>name==='data-lh-seven-background-task'?sevenTaskId:taskId}},location:{href:'https://seller.shopee.tw/portal/sale/mass/ship'},URL,XMLHttpRequest});
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../network-hook.js'),'utf8'),{window,document:{documentElement:{getAttribute:name=>name==='data-lh-family-background-task'?familyTaskId:name==='data-lh-seven-background-task'?sevenTaskId:taskId}},location:{href:'https://seller.shopee.tw/portal/sale/mass/ship'},URL,XMLHttpRequest});
 (async()=>{
 assert.equal(window.open('/awbprint?job_id=a','_blank'),'native');taskId='task-1';
 assert.equal(window.open('/awbprint?job_id=a','_blank','noopener'),null);assert.equal(posted[0].taskId,taskId);assert.equal(opened.length,1);
@@ -21,6 +21,13 @@ for(const url of [redirect.replace('https:','http:'),redirect.replace('.com/', '
 sevenTaskId='old';assert.equal(window.open(redirect,'_blank'),'native');sevenTaskId=taskId;
 assert.equal(window.open('','seven-form','width=800'),'native');assert.equal(window.open('https://example.com/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx','_blank'),'native');
 taskId='';assert.equal(window.open(seven,'_blank'),'native');assert.equal(window.open(redirect,'_blank'),'native');
+const family='https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo';
+assert.equal(window.open(family,'_blank'),'native');taskId='family-1';familyTaskId=taskId;sevenTaskId='';
+for(const url of [family,redirect]){assert.equal(window.open(url,'_blank','noopener'),null);assert.equal(posted.at(-1).type,'BACKGROUND_FAMILY_PREVIEW');}
+assert.equal(window.open(seven,'_blank'),'native');
+for(const url of [family.replace('https:','http:'),family.replace('api.sls.shopee.tw','evil.example'),family.replace('shipping_label','other')])assert.equal(window.open(url,'_blank'),'native');
+familyTaskId='old';assert.equal(window.open(family,'_blank'),'native');familyTaskId=taskId;taskId='';assert.equal(window.open(family,'_blank'),'native');
+console.log('PASS: FamilyMart task-only direct/redirect background routing; unrelated, stale, cancelled and native windows untouched');
 console.log('PASS: 7-ELEVEN task-only background routing; blank form handles, unrelated sites and native mode preserved');
 console.log('PASS: request task snapshot, cancelled late previews discarded, background preview routed, native final print/other sites preserved');
 })();

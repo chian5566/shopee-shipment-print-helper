@@ -1,6 +1,6 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
-let handler,updated;const forwarded=[],removed=[];
-const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},tabs:{onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(){}},sendMessage:(id,msg,cb)=>{forwarded.push({id,msg});cb?.({ok:true});},remove:(id,cb)=>{removed.push(id);cb?.();},get:(id,cb)=>cb({id,url:familyUrl})}};
+let handler,updated;const forwarded=[],removed=[],created=[];
+const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},tabs:{create:(opts,cb)=>{created.push(opts);cb({id:100+created.length});},onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(){}},sendMessage:(id,msg,cb)=>{forwarded.push({id,msg});cb?.({ok:true});},remove:(id,cb)=>{removed.push(id);cb?.();},get:(id,cb)=>cb({id,url:familyUrl})}};
 const familyUrl='https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo';
 const family=require('../familymart.js');vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL,LHFamilyMart:family});
 const source='https://seller.shopee.tw/portal/sale/mass/ship',ids=['250101TEST0001','250101TEST0002'];
@@ -8,6 +8,9 @@ const send=(msg,id=7,url=source,openerTabId)=>{let reply;handler(msg,{tab:{id,ur
 const start=(id,taskId,extra={})=>send({type:'START_DOCUMENT_TASK',taskId,familyMart:true,orderIds:ids,...extra},id);
 assert.equal(start(7,'t',{sevenEleven:true}).ok,false);assert.equal(start(7,'t',{orderIds:[ids[0],ids[0]]}).ok,false);
 assert.equal(start(7,'t').ok,true);
+const open=(url=familyUrl,taskId='t',sourceId=7)=>send({type:'OPEN_BACKGROUND_FAMILY_PREVIEW',taskId,url},sourceId);
+assert.equal(open().ok,true);assert.equal(created[0].active,false);assert.equal(created[0].openerTabId,7);
+assert.equal(open().ok,true);assert.equal(created.length,1);assert.equal(open(familyUrl,'old').ok,false);assert.equal(open(familyUrl,'t',8).ok,false);assert.equal(open('https://evil.example').ok,false);
 const get=(orderIds=ids,tab=20,url=familyUrl,opener=7)=>send({type:'GET_FAMILY_TASK',orderIds},tab,url,opener);
 assert.equal(get(ids,20,'https://evil.test').ok,false);assert.equal(get([ids[0]]).ok,false);assert.equal(get([ids[0],ids[0]]).ok,false);assert.equal(get(ids,20,familyUrl,8).ok,false);
 assert.equal(get().taskId,'t');
