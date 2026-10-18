@@ -4,7 +4,7 @@
 
 **完全免費，以後也不會收費。目前僅支援熱感列印。**
 
-目前版本：**v0.11.1**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.3**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 物流支援
 
@@ -22,7 +22,7 @@
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.1/shopee-shipment-print-helper-v0.11.1.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.1 安裝檔</a>（`shopee-shipment-print-helper-v0.11.1.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.3/shopee-shipment-print-helper-v0.11.3.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.3 安裝檔</a>（`shopee-shipment-print-helper-v0.11.3.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
@@ -43,7 +43,7 @@
 
 列印紙張選 **100 × 150 mm**，目前建議自訂縮放 **125%**；先確認預覽再印。助手會將新竹物流寄件單預先縮至 80%，配合 125% 列印還原尺寸，避免滿版內容超出紙張。
 
-7-ELEVEN 原單會在背景處理，等待助手完成即可；合併文件成功產生後會自動關閉原單。原始 QR 圖片在本機擷取，按訂單編號與裝箱單配對。**7-ELEVEN 與其他物流請分開下載。**
+7-ELEVEN 原單會在背景處理，等待助手完成即可；合併文件成功產生後會自動關閉原單。原始 QR 圖片在本機擷取，按訂單編號與裝箱單配對。不同來源版面會保留圖片長寬比例，較大的原單等比例縮小至 100 × 150 mm 內，較小的維持原大小；建議的 125% 列印設定同樣適用。**7-ELEVEN 與其他物流請分開下載。**
 
 選「一般列印」時，仍可使用蝦皮原本的下載方式，但助手不會整理文件。重新整理頁面會清空助手的列印任務。
 

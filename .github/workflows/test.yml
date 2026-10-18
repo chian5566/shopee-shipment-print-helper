@@ -11,6 +11,23 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - run: npm ci --ignore-scripts --omit=optional
+      # PDF runtime tests and reproducible builds need the platform packages
+      # supplied by @napi-rs/canvas and esbuild as optional dependencies.
+      - run: npm ci --ignore-scripts --include=optional
       - run: npm test
       - run: npm run check
+  browser:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --include=optional
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

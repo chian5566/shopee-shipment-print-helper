@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.1';
+  const VERSION = '0.11.3';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -206,7 +206,8 @@
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
       receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
-      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0,
+      sevenLabelSizes:(task.sevenLabels || []).map((label,index)=>({label:index+1,width:label.width,height:label.height,sourceWidth:label.sourceWidth,sourceHeight:label.sourceHeight}))
     },null,2);
   }
 
@@ -321,9 +322,12 @@
       task.documentInfo=docs.map((doc,index)=>({file:index+1,pages:doc.getPageCount(),pageSizes:doc.getPages().map(page=>page.getSize())}));
       task.stage='辨識裝箱單';
       // Parse the table to identify the packing document; both source files may be thermal-sized.
-      const pdfjs = await import(chrome.runtime.getURL('vendor/pdf.min.mjs'));
-      globalThis.pdfjsWorker ||= await import(chrome.runtime.getURL('vendor/pdf.worker.min.mjs'));
-      pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdf.worker.min.mjs');
+      // Both libraries are packaged classic scripts loaded in Chrome's isolated world.
+      // No module fetch or page CSP dependency at merge time.
+      const pdfjs = globalThis.pdfjsLib;
+      if (!pdfjs?.getDocument || !globalThis.pdfjsWorker?.WorkerMessageHandler) {
+        throw new Error('PDF 辨識元件未完整載入，請重新載入印單助手並重新整理蝦皮頁面；若仍失敗，請重新解壓縮完整安裝包。');
+      }
       const candidates = await Promise.allSettled(files.map(bytes => globalThis.LHPackingSlip.readPacking(bytes, pdfjs)));
       task.packingChecks=candidates.map((result,index)=>result.status==='fulfilled' ? {file:index+1,status:'parsed',orders:result.value.length,rows:result.value.map(section=>section.rows.length)} : {file:index+1,status:'rejected',error:errorInfo(result.reason)});
       const packingIndices = candidates.map((result,index) => result.status === 'fulfilled' && result.value.every(page=>page.orderId) ? index : -1).filter(index => index >= 0);
