@@ -1,16 +1,17 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(require.resolve('../content.js'),'utf8');
-// Replace browser-only module loading; run the actual merge lifecycle with controlled I/O.
+// Run the actual merge lifecycle with controlled PDF I/O.
 const merge=source.slice(source.indexOf('  async function mergeNativeDocuments('),source.indexOf('  function refreshPageLayout('))
-.replace("const pdfjs = await import(chrome.runtime.getURL('vendor/pdf.min.mjs'));",'const pdfjs = fakePdfjs;')
-.replace("globalThis.pdfjsWorker ||= await import(chrome.runtime.getURL('vendor/pdf.worker.min.mjs'));",'globalThis.pdfjsWorker ||= {};');
+.replace('const pdfjs = globalThis.pdfjsLib;', 'const pdfjs = fakePdfjs;')
+.replace('if (!pdfjs?.getDocument || !globalThis.pdfjsWorker?.WorkerMessageHandler)', 'if (false)');
 const id='250101TEST0001';
-async function scenario(mode){
+async function scenario(mode,carrier='seven'){
  const events=[];let release,started;const saving=new Promise(resolve=>started=resolve),held=new Promise((resolve,reject)=>release=mode==='failure'?reject:resolve);
  const doc={getPageCount:()=>1,getPages:()=>[{getSize:()=>({width:100,height:150})}],getPage:()=>({getWidth:()=>100})};
  const out={registerFontkit(){},embedFont:async()=>({}),save(){events.push('saving');started();return held;}};
- const task={id:'task',orders:[{orderId:id}],expectedFiles:1,sevenEleven:true,sevenLabels:[{orderId:id}],previewFiles:[{bytes:new Uint8Array([1])}]};
+ const task={id:'task',orders:[{orderId:id}],expectedFiles:1,sevenEleven:carrier==='seven',familyMart:carrier==='family',sevenLabels:[{orderId:id}],previewFiles:[{bytes:new Uint8Array([1])}]};
  const context={task,fakePdfjs:{GlobalWorkerOptions:{}},Blob,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},document:{documentElement:{removeAttribute(){}}},chrome:{runtime:{sendMessage:m=>events.push(m.type),getURL:path=>path}},renderTasks(){},loadChineseFontBytes:async()=>new Uint8Array(),markTaskReady(){events.push('ready');},failTask(task,detail){task.failed=true;task.failure=detail;events.push('failed');started();},window:{PDFLib:{PDFDocument:{load:async()=>doc,create:async()=>out},StandardFonts:{CourierBold:'CourierBold'}},clearTimeout(){}},LHPackingSlip:{readPacking:async()=>[{orderId:id,rows:[]}],matchPackingToLabels:rows=>rows,appendRows:async()=>{}},LHSevenEleven:{validateLabels(){},appendLabel:async()=>{}},errorInfo:e=>({message:e.message})};
+ context.LHFamilyMart=context.LHSevenEleven;
  vm.createContext(context);vm.runInContext(merge,context);const running=vm.runInContext('mergeNativeDocuments(task)',context);
  await saving;assert.deepEqual(events,['saving'],task.failure);
  if(mode==='cancel')task.cancelled=true;
@@ -28,4 +29,4 @@ async function mixedCarrier(){
  vm.createContext(context);vm.runInContext(merge,context);await vm.runInContext('mergeNativeDocuments(task)',context);assert.deepEqual(events,['copy:0','hct:1','ready']);
  console.log('PASS: mixed-carrier merge identifies HCT by matched order ID even when source label order is reversed; other labels copied unchanged');
 }
-(async()=>{for(const mode of ['success','failure','cancel'])await scenario(mode);await mixedCarrier();console.log('PASS: original stays open while saving; completion sent only after PDF success, never on failure or late cancellation');})().catch(e=>{console.error(e);process.exitCode=1;});
+(async()=>{for(const carrier of ['seven','family'])for(const mode of ['success','failure','cancel'])await scenario(mode,carrier);await mixedCarrier();console.log('PASS: original stays open while saving; completion sent only after PDF success, never on failure or late cancellation');})().catch(e=>{console.error(e);process.exitCode=1;});

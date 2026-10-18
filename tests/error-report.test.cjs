@@ -32,3 +32,13 @@ test('dialog copies exact text, falls back to selection, closes and returns focu
  d.nodes['.lh-error-done'].onclick();assert.equal(d.removed,true);assert.equal(trigger.focused,true);
  s.context.api.showErrorDetails(s.task);s.context.api.closeErrorDialog();assert.equal(s.dialogs[1].removed,true);
 });
+
+
+test('7-ELEVEN diagnostics include only numeric layout dimensions, never image or order contents',()=>{
+ const s=setup();
+ s.task.sevenEleven=true;
+ s.task.sevenLabels=[{orderId:'250101TEST0001',png:'private bitmap payload',width:307,height:455,sourceWidth:306.25,sourceHeight:454.125}];
+ const report=s.context.api.diagnosticText(s.task);
+ assert.match(report,/306.25/);assert.match(report,/454.125/);assert.match(report,/sevenLabelSizes/);
+ assert.doesNotMatch(report,/private bitmap|250101TEST0001/);
+});

@@ -13,7 +13,7 @@ if(!development){
  assert.ok(readme.includes(`/releases/download/v${manifest.version}/shopee-shipment-print-helper-v${manifest.version}.zip`),'README must download the current release');
 }
 assert.deepEqual(manifest.permissions,['tabs','scripting']);
-assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx']);
+assert.deepEqual(manifest.host_permissions,['https://seller.shopee.tw/*','https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx','https://api.sls.shopee.tw/api/logistic/familymart/shipping_label*']);
 assert.equal(require('../package.json').license,'SEE LICENSE IN LICENSE.md');
 const required=new Set([...Object.values(manifest.icons),'LICENSE.md']);
 for(const script of manifest.content_scripts)for(const file of [...(script.js||[]),...(script.css||[])])required.add(file);
@@ -22,11 +22,12 @@ required.add('seven-eleven.js');
 assert.ok(!manifest.action.default_popup,'Toolbar must open the assistant directly');
 for(const rule of manifest.web_accessible_resources)for(const file of rule.resources)required.add(file);
 for(const file of required)assert.ok(fs.existsSync(path.join(root,file)),`Missing: ${file}`);
-const forbidden=/(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\/Users\/|ArialUnicode|HiraginoSansGB|TW(?!0{12})\d{10,})/;
+require('./build-pdf-classic.cjs')(true);
+const forbidden=/(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\/Users\/|TW(?!0{12})\d{10,})/;
 function scan(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){if(['.git','node_modules','tmp','output','dist'].includes(entry.name))continue;const file=path.join(dir,entry.name);if(entry.isDirectory())scan(file);else if(/\.(?:js|cjs|json|md|yml)$/.test(entry.name)){
  const text=fs.readFileSync(file,'utf8');if(file===__filename)continue;
  assert.ok(!forbidden.test(text),`Private or excluded data found: ${path.relative(root,file)}`);
- if(!file.includes(path.sep+'vendor'+path.sep)){const ids=text.match(/\b\d{6}(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6,20}\b/g)||[];assert.ok(ids.every(id=>id.startsWith('250101TEST')),`Non-demo order ID: ${path.relative(root,file)}`);}
+ if(!file.includes(path.sep+'vendor'+path.sep)){assert.ok(!/ArialUnicode|HiraginoSansGB/.test(text),`Excluded font: ${path.relative(root,file)}`);const ids=text.match(/\b\d{6}(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6,20}\b/g)||[];assert.ok(ids.every(id=>id.startsWith('250101TEST')),`Non-demo order ID: ${path.relative(root,file)}`);}
 }}}
 scan(root);
 const versions=[['vendor/pdf.min.mjs','6.4.299'],['vendor/pdf.worker.min.mjs','6.4.299']];for(const [file,v]of versions)assert.ok(fs.readFileSync(path.join(root,file),'utf8').includes(v));

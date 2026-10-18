@@ -1,10 +1,12 @@
 # LEISURE HOMME 出貨印單助手
 
+**此工具已上架 Chrome 線上應用程式商店，請直接前往[安裝](https://chromewebstore.google.com/detail/pallcldjfgojcnbcnkmcpibhfpnkkfgf)。**
+
 幫蝦皮賣家把同一筆訂單的寄件單與裝箱單排在一起，方便列印、包貨。
 
-**完全免費，以後也不會收費。目前僅支援熱感列印。**
+**完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
 
-目前版本：**v0.11.1**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.3**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 物流支援
 
@@ -15,14 +17,14 @@
 | 店到家宅配 | ✅ |
 | 7-ELEVEN | ✅ |
 | 新竹物流 | ✅ |
-| 全家 | ❌ |
+| 全家 | ✅（單筆實機已驗證，多筆待實單測試） |
 | 其他寄送方式 | ❌ |
 
 ✅ 可由助手整理寄件單與裝箱單；❌ 尚未支援，請使用蝦皮原本的下載方式。
 
 ## 安裝
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.1/shopee-shipment-print-helper-v0.11.1.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.1 安裝檔</a>（`shopee-shipment-print-helper-v0.11.1.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.3/shopee-shipment-print-helper-v0.11.3.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.3 安裝檔</a>（`shopee-shipment-print-helper-v0.11.3.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
@@ -37,13 +39,13 @@
 
 1. 前往蝦皮 <a href="https://seller.shopee.tw/portal/sale/mass/ship?mass_shipment_tab=301" target="_blank" rel="noopener noreferrer">批次出貨 → 下載出貨文件</a>。
 2. 點「印」字圖示開啟助手，再點一次可關閉；確認要出貨的訂單（助手會先選取目前頁面的訂單）。
-3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」（7-ELEVEN 使用原生服務單，不需選此格式）。
+3. 同時勾選「寄件單」與「裝箱單」，寄件單選「熱感列印」（7-ELEVEN、全家使用原生寄件單，不需選此格式）。
 4. 按蝦皮的「下載所選文件」。
 5. 助手顯示「文件已完成，可預覽」後，按「預覽文件」，再從預覽視窗列印。
 
 列印紙張選 **100 × 150 mm**，目前建議自訂縮放 **125%**；先確認預覽再印。助手會將新竹物流寄件單預先縮至 80%，配合 125% 列印還原尺寸，避免滿版內容超出紙張。
 
-7-ELEVEN 原單會在背景處理，等待助手完成即可；合併文件成功產生後會自動關閉原單。原始 QR 圖片在本機擷取，按訂單編號與裝箱單配對。**7-ELEVEN 與其他物流請分開下載。**
+7-ELEVEN 原單會在背景處理，等待助手完成即可；合併文件成功產生後會自動關閉原單。原始 QR 圖片在本機擷取，按訂單編號與裝箱單配對。不同來源版面會保留圖片長寬比例，較大的原單等比例縮小至 100 × 150 mm 內，較小的維持原大小；建議的 125% 列印設定同樣適用。**7-ELEVEN 與其他物流請分開下載。**
 
 選「一般列印」時，仍可使用蝦皮原本的下載方式，但助手不會整理文件。重新整理頁面會清空助手的列印任務。
 
@@ -68,3 +70,5 @@
 ### 錯誤回報
 
 失敗任務會顯示 Google 表單回報連結與「查看錯誤詳情」按鈕。點開視窗後可複製版本、失敗時間與階段、錯誤堆疊、文件大小與頁數、裝箱單辨識結果，再貼到回報表單。若無法自動複製，視窗會選取全文供手動複製。原始文件下載連結仍保留。
+
+全家原單以背景分頁開啟，畫面保留在蝦皮出貨頁。全家會在本機讀取原生寄件單圖片內的 QR 訂單編號，裁開已驗證的四格版型，再與裝箱單逐筆配對。全家與其他物流請分開下載；不明版型、QR 無法辨識或訂單不符時停止產生，保留原單供核對。合併文件使用 100 × 150 mm，沿用 125% 列印設定。全家頁面需允許 `api.sls.shopee.tw` 的 `/api/logistic/familymart/shipping_label` 路徑。
