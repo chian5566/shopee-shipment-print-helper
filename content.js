@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.3';
+  const VERSION = '0.11.4';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -35,9 +35,9 @@
     return [...new Set([...own,...Object.values(value).flatMap(child=>findJobIds(child,depth+1))])];
   }
   window.addEventListener('message', (event) => {
-    if (event.source === window && event.data?.source === 'lh-print' && ['BACKGROUND_PREVIEW','BACKGROUND_SEVEN_PREVIEW'].includes(event.data.type)) {
+    if (event.source === window && event.data?.source === 'lh-print' && ['BACKGROUND_PREVIEW','BACKGROUND_SEVEN_PREVIEW','BACKGROUND_FAMILY_PREVIEW'].includes(event.data.type)) {
       const task=activeTask;
-      if (task && !task.cancelled && !task.failed && event.data.taskId===task.id && (event.data.type!=='BACKGROUND_SEVEN_PREVIEW' || task.sevenEleven)) chrome.runtime.sendMessage({type:event.data.type==='BACKGROUND_SEVEN_PREVIEW'?'OPEN_BACKGROUND_SEVEN_PREVIEW':'OPEN_BACKGROUND_PREVIEW',taskId:task.id,url:event.data.url},response=>{
+      if (task && !task.cancelled && !task.failed && event.data.taskId===task.id && (event.data.type!=='BACKGROUND_SEVEN_PREVIEW' || task.sevenEleven) && (event.data.type!=='BACKGROUND_FAMILY_PREVIEW' || task.familyMart)) chrome.runtime.sendMessage({type:event.data.type==='BACKGROUND_FAMILY_PREVIEW'?'OPEN_BACKGROUND_FAMILY_PREVIEW':event.data.type==='BACKGROUND_SEVEN_PREVIEW'?'OPEN_BACKGROUND_SEVEN_PREVIEW':'OPEN_BACKGROUND_PREVIEW',taskId:task.id,url:event.data.url},response=>{
         if((chrome.runtime.lastError || !response?.ok) && activeTask===task && !task.cancelled && !task.combinedUrl) failTask(task,'背景文件開啟失敗，請重新下載。',new Error(chrome.runtime.lastError?.message || response?.error || '背景文件開啟失敗'));
       });
       return;
@@ -145,6 +145,9 @@
     const sevenCount=orders.filter(order=>/7-ELEVEN/i.test(order.summary)).length;
     if(sevenCount && sevenCount!==orders.length)return {enabled:false,hint:'請將 7-ELEVEN 與其他物流分開下載，避免寄件單格式混用。'};
     if(sevenCount)return {enabled:true,hint:'',sevenEleven:true};
+    const familyCount=orders.filter(order=>/全家|FamilyMart/i.test(order.summary)).length;
+    if(familyCount && familyCount!==orders.length)return {enabled:false,hint:'請將全家與其他物流分開下載，避免寄件單格式混用。'};
+    if(familyCount)return {enabled:true,hint:'',familyMart:true};
     if (!thermalLabelSelected()) return {enabled:false,hint:THERMAL_HINT};
     return {enabled:true,hint:''};
   }
@@ -169,7 +172,7 @@
       cancelTask(activeTask);
     }
     activeTask=null;
-    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');document.documentElement.removeAttribute('data-lh-family-background-task');
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK'});
     renderMode();renderTasks();
     const mode=assistantMode();
@@ -183,15 +186,16 @@
       const task={name:'寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
       tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
-    const startedAt=Date.now(),expectedFiles=mode.sevenEleven?(documentCheckbox('撿貨單')?.checked?2:1):2;
-    const carrierName=mode.sevenEleven?'7-ELEVEN ':orders.every(order=>globalThis.LHPrintLayout?.isHctOrder(order))?'新竹物流 ':'';
-    const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),progress:10};
+    const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?(documentCheckbox('撿貨單')?.checked?2:1):2;
+    const carrierName=mode.familyMart?'全家 ':mode.sevenEleven?'7-ELEVEN ':orders.every(order=>globalThis.LHPrintLayout?.isHctOrder(order))?'新竹物流 ':'';
+    const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
+    if(task.familyMart)document.documentElement.setAttribute('data-lh-family-background-task',task.id);
     if(task.sevenEleven)document.documentElement.setAttribute('data-lh-seven-background-task',task.id);
-    chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,orderIds:orders.map(order=>order.orderId)});
+    chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,familyMart:task.familyMart,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
-    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,task.sevenEleven?'尚未取得完整文件，請確認 7-ELEVEN 服務單視窗已開啟、圖片載入完成且擴充功能已允許該網站。':'尚未取得完整文件，請重新下載。');},90000);
+    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:'尚未取得完整文件，請重新下載。');},90000);
   }
 
   function errorInfo(error) {
@@ -206,7 +210,7 @@
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
       receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
-      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0,
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.familyMart?'全家':task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0,
       sevenLabelSizes:(task.sevenLabels || []).map((label,index)=>({label:index+1,width:label.width,height:label.height,sourceWidth:label.sourceWidth,sourceHeight:label.sourceHeight}))
     },null,2);
   }
@@ -245,7 +249,7 @@
     task.failedAt=Date.now();task.error=errorInfo(error || new Error(detail));
     for(const timer of [task.waitTimer,task.mergeTimer,task.jobTimer,task.readyTimer])window.clearTimeout(timer);
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
-    if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');}
+    if(activeTask===task){activeTask=null;document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');document.documentElement.removeAttribute('data-lh-family-background-task');}
     renderTasks();
   }
 
@@ -264,7 +268,7 @@
     closeErrorDialog();
     for (const task of tasks) cancelTask(task);
     activeTask=null;tasks=[];
-    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');document.documentElement.removeAttribute('data-lh-family-background-task');
     chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK'});
     renderTasks();
   }
@@ -306,10 +310,10 @@
   }
 
   async function mergeNativeDocuments(task) {
-    if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || (task.sevenEleven && !task.sevenLabels)) return;
+    if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) return;
     task.merging = true;
-    if(!task.sevenEleven)chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
-    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');
+    if(!task.sevenEleven && !task.familyMart)chrome.runtime.sendMessage({type:'STOP_DOCUMENT_TASK',taskId:task.id});
+    document.documentElement.removeAttribute('data-lh-background-task');document.documentElement.removeAttribute('data-lh-seven-background-task');document.documentElement.removeAttribute('data-lh-family-background-task');
     try {
       task.stage='載入原始 PDF';
       task.progress = 65; task.detail = '正在處理文件…'; renderTasks();
@@ -335,12 +339,12 @@
       const packingIndex = packingIndices[0];
       const rowsByPage = candidates[packingIndex].value;
       const labelIndices=docs.map((doc,index)=>index!==packingIndex && (files.length===2 || doc.getPage(0).getWidth()<=320)?index:-1).filter(index=>index>=0);
-      if(!task.sevenEleven && labelIndices.length!==1)throw new Error('無法唯一辨識寄件單，請下載原始文件核對');
-      const labelIndex=labelIndices[0],label=task.sevenEleven?null:docs[labelIndex];
+      if(!task.sevenEleven && !task.familyMart && labelIndices.length!==1)throw new Error('無法唯一辨識寄件單，請下載原始文件核對');
+      const labelIndex=(task.sevenEleven || task.familyMart)?undefined:labelIndices[0],label=(task.sevenEleven || task.familyMart)?null:docs[labelIndex];
       task.stage='配對訂單與寄件單';
       task.additionalUrls=task.sourceUrls.filter((url,index)=>index!==packingIndex&&index!==labelIndex);
-      if(task.sevenEleven)globalThis.LHSevenEleven.validateLabels(task.sevenLabels,task.orders.map(order=>order.orderId));
-      const labelOrderIds = task.sevenEleven?task.sevenLabels.map(item=>item.orderId):await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
+      if(task.sevenEleven || task.familyMart)(task.familyMart?globalThis.LHFamilyMart:globalThis.LHSevenEleven).validateLabels(task.sevenLabels,task.orders.map(order=>order.orderId));
+      const labelOrderIds = (task.sevenEleven || task.familyMart)?task.sevenLabels.map(item=>item.orderId):await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
       if (rowsByPage.length!==task.orders.length || task.orders.some(order=>!rowsByPage.some(p=>p.orderId===order.orderId))) throw new Error('裝箱單與本次已選訂單不符，已停止產生');
       const orderedPacking = globalThis.LHPackingSlip.matchPackingToLabels(rowsByPage,labelOrderIds);
       const out = await PDFDocument.create();
@@ -350,7 +354,7 @@
       const numberFont = await out.embedFont(window.PDFLib.StandardFonts.CourierBold);
       for (let i=0;i<labelOrderIds.length;i++) {
         const packing=orderedPacking[i];
-        if(task.sevenEleven)await globalThis.LHSevenEleven.appendLabel(out,task.sevenLabels[i],window.PDFLib);
+        if(task.sevenEleven || task.familyMart)await (task.familyMart?globalThis.LHFamilyMart:globalThis.LHSevenEleven).appendLabel(out,task.sevenLabels[i],window.PDFLib);
         else {
           const order=task.orders.find(order=>order.orderId===labelOrderIds[i]);
           if(globalThis.LHPrintLayout.isHctOrder(order))await globalThis.LHPrintLayout.appendHctLabel(out,label.getPage(i),window.PDFLib);
@@ -365,7 +369,7 @@
       task.combinedUrl = URL.createObjectURL(new Blob([output], { type: 'application/pdf' }));
       window.clearTimeout(task.waitTimer);
       markTaskReady(task);
-      if(task.sevenEleven)chrome.runtime.sendMessage({type:'COMPLETE_DOCUMENT_TASK',taskId:task.id});
+      if(task.sevenEleven || task.familyMart)chrome.runtime.sendMessage({type:'COMPLETE_DOCUMENT_TASK',taskId:task.id});
     } catch (error) { if(!task.cancelled)failTask(task,`合併失敗：${error.message}`,error); }
     finally { task.merging = false; }
   }
@@ -457,11 +461,11 @@
       }
       return;
     }
-    if(message.type==='PREVIEW_SEVEN_LABELS'){
-      const task=activeTask;if(!task?.sevenEleven || task.cancelled || task.failed || task.combinedUrl || message.taskId!==task.id || task.sevenLabels){sendResponse?.({ok:false});return;}
-      try{globalThis.LHSevenEleven.validateLabels(message.labels,task.orders.map(order=>order.orderId));task.sevenLabels=message.labels;sendResponse?.({ok:true});}
-      catch(error){sendResponse?.({ok:false});failTask(task,`7-ELEVEN 文件讀取失敗：${error.message}`,error);return;}
-      task.detail='7-ELEVEN 寄件單已取得，正在核對装箱單…';renderTasks();
+    if(message.type==='PREVIEW_SEVEN_LABELS' || message.type==='PREVIEW_FAMILY_LABELS'){
+      const task=activeTask;if(!(message.type==='PREVIEW_FAMILY_LABELS'?task?.familyMart:task?.sevenEleven) || task.cancelled || task.failed || task.combinedUrl || message.taskId!==task.id || task.sevenLabels){sendResponse?.({ok:false});return;}
+      try{(task.familyMart?globalThis.LHFamilyMart:globalThis.LHSevenEleven).validateLabels(message.labels,task.orders.map(order=>order.orderId));task.sevenLabels=message.labels;sendResponse?.({ok:true});}
+      catch(error){sendResponse?.({ok:false});failTask(task,`${task.familyMart?'全家':'7-ELEVEN'} 文件讀取失敗：${error.message}`,error);return;}
+      task.detail=(task.familyMart?'全家':'7-ELEVEN')+' 寄件單已取得，正在核對裝箱單…';renderTasks();
       window.clearTimeout(task.mergeTimer);task.mergeTimer=window.setTimeout(()=>mergeNativeDocuments(task),600);return;
     }
     if (message.type === 'PREVIEW_URL') return; // Ignore notifications from an older worker.

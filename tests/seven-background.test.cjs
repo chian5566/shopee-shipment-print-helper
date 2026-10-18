@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 let handler,updated;const created=[],activated=[],focused=[];let originalFocused=true,sourceUrl='https://seller.shopee.tw/portal/sale/mass/ship',holdSource=false,pendingSource;
 const seven='https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx',ids=['250101TEST0001'];
 const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},windows:{get(id,cb){cb({id,focused:originalFocused});},update(id,opts,cb){focused.push({id,...opts});cb();}},tabs:{get(id,cb){const run=()=>cb({id,url:sourceUrl,windowId:7});if(holdSource)pendingSource=run;else run();},update(id,opts,cb){activated.push({id,...opts});cb();},create(opts,cb){created.push(opts);cb({id:100+created.length});},onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(){}},remove(){}}};
-vm.runInNewContext(fs.readFileSync(require.resolve('../seven-eleven.js'),'utf8')+'\n'+fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL});
+vm.runInNewContext(fs.readFileSync(require.resolve('../familymart.js'),'utf8')+'\n'+fs.readFileSync(require.resolve('../seven-eleven.js'),'utf8')+'\n'+fs.readFileSync(require.resolve('../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL});
 function send(msg,id=1,url=sourceUrl){let reply;handler(msg,{tab:{id,url,windowId:7}},r=>reply=r);return reply;}
 const start=(taskId,sevenEleven=true)=>send({type:'START_DOCUMENT_TASK',taskId,sevenEleven,orderIds:ids});
 start('t');assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'t',url:seven}).ok,true);assert.equal(created.length,1);assert.equal(created[0].active,false);assert.equal(created[0].openerTabId,1);assert.equal(created[0].windowId,7);
@@ -23,3 +23,12 @@ sourceUrl='https://seller.shopee.tw/portal/home';updated(34,{status:'complete'},
 holdSource=true;updated(35,{status:'complete'},{...tab,id:35});send({type:'STOP_DOCUMENT_TASK',taskId:'t'});pendingSource();holdSource=false;assert.equal(focused.length,1);
 start('ordinary',false);assert.equal(send({type:'OPEN_BACKGROUND_SEVEN_PREVIEW',taskId:'ordinary',url:seven}).ok,false);updated(36,{status:'complete'},{...tab,id:36});assert.equal(focused.length,1);
 console.log('PASS: background 7-ELEVEN tab creation, duplicate/stale/wrong-source guards, native popup focus restoration once, inactive/unrelated/unfocused/cancelled/left-source cases untouched');
+
+send({type:'START_DOCUMENT_TASK',taskId:'family',familyMart:true,orderIds:ids});
+const familyTab={...tab,id:50,url:'https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo'};
+updated(50,{status:'loading'},familyTab);assert.equal(focused.length,2);assert.equal(activated.at(-1).id,1);
+updated(50,{status:'complete'},familyTab);assert.equal(focused.length,2);
+updated(51,{status:'complete'},{...familyTab,id:51,active:false});assert.equal(focused.length,2);
+originalFocused=false;updated(52,{status:'complete'},{...familyTab,id:52});assert.equal(focused.length,2);originalFocused=true;
+send({type:'STOP_DOCUMENT_TASK',taskId:'family'});updated(53,{status:'complete'},{...familyTab,id:53});assert.equal(focused.length,2);
+console.log('PASS: FamilyMart native-popup fallback restores source once; inactive, unfocused and cancelled tasks remain untouched');

@@ -25,6 +25,12 @@
       window.postMessage({source:'lh-print',type:'BACKGROUND_SEVEN_PREVIEW',taskId,url:target.href},'*');
       return null;
     }
+    const isFamily=(target?.origin==='https://api.sls.shopee.tw' && target.pathname==='/api/logistic/familymart/shipping_label') ||
+      (target?.origin==='https://sellerfulfilment-shipment-sea.cache.susercontent.com' && /^\/sd-[a-z0-9-]+\/[A-Za-z0-9_-]+--html_c2c_shipping_label_redirect\.html$/.test(target.pathname));
+    if(taskId && document.documentElement.getAttribute('data-lh-family-background-task')===taskId && isFamily){
+      window.postMessage({source:'lh-print',type:'BACKGROUND_FAMILY_PREVIEW',taskId,url:target.href},'*');
+      return null;
+    }
     const isPreview=target?.origin==='https://seller.shopee.tw' && target.pathname==='/awbprint' && target.searchParams.has('job_id');
     const owner=isPreview && jobTasks.get(target.searchParams.get('job_id'));
     if (owner && owner!==taskId) return null; // Discard a cancelled task's late preview.
