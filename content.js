@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.4';
+  const VERSION = '0.11.5';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -164,6 +164,18 @@
     hint.style?.setProperty('display',mode.enabled?'none':'block','important');
   }
 
+  function taskCarrierName(orders, mode) {
+    if (mode.familyMart) return '全家';
+    if (mode.sevenEleven) return '7-ELEVEN';
+    const carriers = orders.map(order => {
+      if (globalThis.LHPrintLayout?.isHctOrder(order)) return '新竹物流';
+      const name = order.summary.match(/蝦皮店到店\s*[-－–—]?\s*隔日到貨|蝦皮店到店|店到家宅配|新竹物流|全家|FamilyMart|7-ELEVEN|其他寄送方式/i)?.[0];
+      if (/^蝦皮店到店.*隔日到貨$/.test(name || '')) return '蝦皮店到店 - 隔日到貨';
+      return name || '其他寄送方式';
+    });
+    return [...new Set(carriers)].join('／') || '物流未辨識';
+  }
+
   function handleNativeDownload(event) {
     if (!isDownloadPage()) return;
     const native=event.target?.closest?.('button, [role="button"]');
@@ -183,11 +195,11 @@
     const orders=selectedOrders();
     if(!panel?.isConnected)makePanel();
     if(!orders.length) {
-      const task={name:'寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
+      const task={name:taskCarrierName(orders,mode)+' 寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
       tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
     const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?(documentCheckbox('撿貨單')?.checked?2:1):2;
-    const carrierName=mode.familyMart?'全家 ':mode.sevenEleven?'7-ELEVEN ':orders.every(order=>globalThis.LHPrintLayout?.isHctOrder(order))?'新竹物流 ':'';
+    const carrierName=taskCarrierName(orders,mode)+' ';
     const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
@@ -309,6 +321,12 @@
     slot.querySelectorAll('.lh-error-details').forEach(button=>{const task=tasks[Number(button.dataset.task)];button.onclick=()=>showErrorDetails(task,button);});
   }
 
+  function samePdfBytes(left, right) {
+    if (left.byteLength !== right.byteLength) return false;
+    const a = new Uint8Array(left), b = new Uint8Array(right);
+    return a.every((value, index) => value === b[index]);
+  }
+
   async function mergeNativeDocuments(task) {
     if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) return;
     task.merging = true;
@@ -317,7 +335,8 @@
     try {
       task.stage='載入原始 PDF';
       task.progress = 65; task.detail = '正在處理文件…'; renderTasks();
-      const files = task.previewFiles.slice(0, 3).map(file=>file.bytes);
+      const files = task.previewFiles.map(file=>file.bytes)
+        .filter((bytes,index,all)=>!all.slice(0,index).some(other=>samePdfBytes(other,bytes))).slice(0,3);
       task.sourceUrls?.forEach(url=>URL.revokeObjectURL(url));
       task.sourceUrls = files.map(bytes=>URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})));
       task.failed = false;
@@ -451,7 +470,9 @@
         if (!raw.startsWith('%PDF-')) throw new Error('蝦皮預覽未提供有效 PDF');
         const bytes=Uint8Array.from(raw,char=>char.charCodeAt(0)).buffer;
         task.previewFiles ||= [];
-        if (!task.previewFiles.some(file=>file.url===message.url)) task.previewFiles.push({url:message.url,bytes});
+        // Shopee can deliver the same PDF from different preview URLs. Count contents,
+        // not URLs, so duplicate packing slips do not become ambiguous candidates.
+        if (!task.previewFiles.some(file=>samePdfBytes(file.bytes,bytes))) task.previewFiles.push({url:message.url,bytes});
         sendResponse?.({ok:true});
       } catch (error) {sendResponse?.({ok:false});failTask(task,`文件讀取失敗：${error.message}`,error);return;}
       task.detail = '正在處理文件…'; task.progress = 55; renderTasks();
