@@ -309,6 +309,12 @@
     slot.querySelectorAll('.lh-error-details').forEach(button=>{const task=tasks[Number(button.dataset.task)];button.onclick=()=>showErrorDetails(task,button);});
   }
 
+  function samePdfBytes(left, right) {
+    if (left.byteLength !== right.byteLength) return false;
+    const a = new Uint8Array(left), b = new Uint8Array(right);
+    return a.every((value, index) => value === b[index]);
+  }
+
   async function mergeNativeDocuments(task) {
     if (task.cancelled || task.merging || task.combinedUrl || (task.previewFiles?.length || 0) < task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) return;
     task.merging = true;
@@ -317,7 +323,8 @@
     try {
       task.stage='載入原始 PDF';
       task.progress = 65; task.detail = '正在處理文件…'; renderTasks();
-      const files = task.previewFiles.slice(0, 3).map(file=>file.bytes);
+      const files = task.previewFiles.map(file=>file.bytes)
+        .filter((bytes,index,all)=>!all.slice(0,index).some(other=>samePdfBytes(other,bytes))).slice(0,3);
       task.sourceUrls?.forEach(url=>URL.revokeObjectURL(url));
       task.sourceUrls = files.map(bytes=>URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})));
       task.failed = false;
@@ -451,7 +458,9 @@
         if (!raw.startsWith('%PDF-')) throw new Error('蝦皮預覽未提供有效 PDF');
         const bytes=Uint8Array.from(raw,char=>char.charCodeAt(0)).buffer;
         task.previewFiles ||= [];
-        if (!task.previewFiles.some(file=>file.url===message.url)) task.previewFiles.push({url:message.url,bytes});
+        // Shopee can deliver the same PDF from different preview URLs. Count contents,
+        // not URLs, so duplicate packing slips do not become ambiguous candidates.
+        if (!task.previewFiles.some(file=>samePdfBytes(file.bytes,bytes))) task.previewFiles.push({url:message.url,bytes});
         sendResponse?.({ok:true});
       } catch (error) {sendResponse?.({ok:false});failTask(task,`文件讀取失敗：${error.message}`,error);return;}
       task.detail = '正在處理文件…'; task.progress = 55; renderTasks();
