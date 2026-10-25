@@ -125,8 +125,8 @@ console.log('PASS: 7-ELEVEN HTML mode, packing/picklist counts, thermal unchange
 document.querySelectorAll=originalQueries;row.innerText='buyer 新竹物流';thermal.checked=true;tick();native.click();
 assert.match(panel.querySelector('.lh-tasks').innerHTML,/新竹物流 寄件單＋裝箱單 × 1 筆/);
 document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();native.click();
-assert.equal(panel.querySelector('.lh-tasks').innerHTML.match(/<b>(.*?)<\/b>/)[1],'寄件單＋裝箱單 × 2 筆');
-console.log('PASS: HCT task title includes carrier; mixed-carrier task title remains generic');
+assert.equal(panel.querySelector('.lh-tasks').innerHTML.match(/<b>(.*?)<\/b>/)[1],'新竹物流／蝦皮店到店 寄件單＋裝箱單 × 2 筆');
+console.log('PASS: HCT task title includes carrier; mixed-carrier task title lists both carriers');
 // FamilyMart has no thermal radio; its image original plus packing PDF are supported.
 document.querySelectorAll=originalQueries;row.innerText='buyer 全家';thermal.checked=false;picklist.checked=false;tick();sent.length=0;native.click();
 const familyStart=sent.findLast(m=>m.type==='START_DOCUMENT_TASK');assert.ok(familyStart.familyMart);assert.equal(attributes['data-lh-family-background-task'],familyStart.taskId);windowEvents.message({source:window,data:{source:'lh-print',type:'BACKGROUND_FAMILY_PREVIEW',taskId:familyStart.taskId,url:'https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo'}});assert.ok(sent.some(m=>m.type==='OPEN_BACKGROUND_FAMILY_PREVIEW'));assert.equal(familyStart.sevenEleven,false);assert.equal(familyStart.expectedFiles,1);assert.match(panel.querySelector('.lh-tasks').innerHTML,/全家 寄件單/);
