@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(require.resolve('../content.js'),'utf8');
 // Run the actual merge lifecycle with controlled PDF I/O.
-const merge=source.slice(source.indexOf('  async function mergeNativeDocuments('),source.indexOf('  function refreshPageLayout('))
+const merge=source.slice(source.indexOf('  function samePdfBytes('),source.indexOf('  function refreshPageLayout('))
 .replace('const pdfjs = globalThis.pdfjsLib;', 'const pdfjs = fakePdfjs;')
 .replace('if (!pdfjs?.getDocument || !globalThis.pdfjsWorker?.WorkerMessageHandler)', 'if (false)');
 const id='250101TEST0001';
