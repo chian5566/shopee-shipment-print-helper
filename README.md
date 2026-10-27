@@ -6,7 +6,11 @@
 
 **完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
 
-目前版本：**v0.11.6**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.7**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+
+## 操作提示
+
+下載文件頁面顯示浮動編號氣泡：勾選訂單 → 熱感列印 → PDF → 下載所選文件。已完成的步驟顯示藍色勾號；物流未提供的格式會自動略過，尚未勾選文件則先提醒勾選寄件單／裝箱單。氣泡不影響原排版，也不攔截滑鼠點擊。
 
 ## 物流支援
 
@@ -28,7 +32,7 @@
 
 ### 手動安裝（進階）
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.6/shopee-shipment-print-helper-v0.11.6.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.6 安裝檔</a>（`shopee-shipment-print-helper-v0.11.6.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.7/shopee-shipment-print-helper-v0.11.7.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.7 安裝檔</a>（`shopee-shipment-print-helper-v0.11.7.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
