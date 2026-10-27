@@ -15,3 +15,9 @@ test('other sites or failed repairs open exact download page',async()=>{
  for(const url of ['https://example.com','chrome://extensions/'])assert.equal((await run(url))[0].url,destination);
  assert.equal((await run(destination,{fail:true})).at(-1).url,destination);
 });
+test('toolbar recovery loads every manifest dependency in the same order',async()=>{
+ const calls=await run(destination,{missing:true});
+ const injected=calls.find(call=>call.files?.includes('content.js'));
+ const declared=require('../manifest.json').content_scripts.find(script=>script.js?.includes('content.js'));
+ assert.deepEqual(injected.files,declared.js);
+});
