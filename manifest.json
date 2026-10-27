@@ -65,7 +65,8 @@
         "packing-slip.js",
         "seven-eleven.js",
         "familymart.js",
-        "content.js"
+        "content.js",
+        "print-guide.js"
       ],
       "css": [
         "panel.css"

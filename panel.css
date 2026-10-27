@@ -79,3 +79,22 @@
   50% { box-shadow:0 0 0 4px rgba(22,163,74,.25); background:#dcfce7; }
 }
 @media (prefers-reduced-motion:reduce) { .lh-ready-flash { animation:none; } }
+
+/* Floating guide never participates in Shopee layout or intercepts a click. */
+#lh-print-guide { position:fixed; inset:0; z-index:2147483646; pointer-events:none; }
+#lh-print-guide .lh-guide-bubble {
+  position:fixed; box-sizing:border-box; width:max-content; max-width:calc(100vw - 16px);
+  padding:6px 10px; border:1px solid #fdba74; border-radius:8px;
+  background:#fff7ed; color:#9a3412; box-shadow:0 2px 8px #17203318;
+  font:600 12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;
+  white-space:nowrap; pointer-events:none;
+}
+#lh-print-guide .lh-guide-bubble[hidden] { display:none !important; }
+#lh-print-guide .lh-guide-bubble[data-done="true"] { background:#f0fdf4; border-color:#86efac; color:#166534; }
+#lh-print-guide .lh-guide-bubble::after {
+  content:""; position:absolute; left:var(--lh-guide-arrow); bottom:-5px;
+  width:7px; height:7px; background:inherit; border-right:1px solid; border-bottom:1px solid;
+  border-color:inherit; transform:translateX(-50%) rotate(45deg);
+}
+#lh-print-guide .lh-guide-bubble[data-below="true"]::after { top:-5px; bottom:auto; transform:translateX(-50%) rotate(225deg); }
+@media print { #lh-print-guide { display:none !important; } }
