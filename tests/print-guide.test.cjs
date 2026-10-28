@@ -59,3 +59,21 @@ test('bubble avoids adjacent document label while arrow stays aligned to radio',
  assert.ok(bubble);assert.equal(bubble.dataset.below,'true');
  const center=328,left=parseFloat(bubble.style.left);assert.ok(center>=left+5&&center<=left+bubble.offsetWidth-5);
 });
+
+test('dense 7-ELEVEN document list keeps shipping prompt visible beside checkbox',()=>{
+ const f=fixture();f.setThermal(false);
+ const rect=(top,width=150)=>({left:320,right:320+width,top,bottom:top+22,width,height:22});
+ const move=(input,top)=>{
+  const label=input.closest('label');label.getBoundingClientRect=()=>rect(top);
+  label.querySelector().getBoundingClientRect=()=>rect(top,16);
+ };
+ move(f.shipping,360);move(f.packing,392);
+ const preceding={closest:()=>null,getClientRects:()=>[rect(328)],getBoundingClientRect:()=>rect(328)};
+ f.setControls([preceding,f.shipping,f.packing]);f.tick();
+ const shipping=f.visible().find(b=>b.textContent==='2. 勾選寄件單');
+ assert.ok(shipping,'second step must not disappear when adjacent labels block vertical placements');
+ assert.equal(shipping.dataset.side,'left');
+ assert.ok(parseFloat(shipping.style.left)+shipping.offsetWidth<320);
+ f.shipping.checked=true;f.tick();
+ assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單 ✓'));
+});
