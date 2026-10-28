@@ -164,7 +164,7 @@
     }
     if (!carrierName) return {enabled:false,hint:'尚未讀取到上方選取的物流方式，請重新選擇物流方式。'};
     const experimental = /^(蝦皮店到店\s*[-－–—]\s*無包裝隔日到|萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName);
-    const experimentalHint = experimental ? '試作物流：尚未經實單驗證，請先核對合併文件與原始寄件單。' : '';
+    const experimentalHint = /^(萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName) ? '此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報' : '';
     if (carrierName === '萊爾富') return {enabled:true,hint:experimentalHint,carrierName,experimental:true,experimentalPdf:true,hilife:true};
     if (/^7-ELEVEN$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,sevenEleven:true};
     if (/^(全家|FamilyMart)$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,familyMart:true};
@@ -180,7 +180,7 @@
     if (mode.hint===PAGE_HINT) {
       hint.innerHTML=`請前往蝦皮「<a href="${DOWNLOAD_PAGE_URL}" style="color:inherit;text-decoration:underline">批次出貨 → 下載出貨文件</a>」頁面使用出貨助手。`;
     }
-    const visible = !mode.enabled || mode.experimental;
+    const visible = !mode.enabled || Boolean(mode.hint);
     hint.hidden=!visible;
     hint.style?.setProperty('display',visible?'block':'none','important');
   }

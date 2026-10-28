@@ -171,13 +171,15 @@ carrierName='蝦皮店到店';label.checked=packing.checked=true;tick();sent.len
 assert.ok(sent.some(m=>m.type==='START_DOCUMENT_TASK'));
 console.log('PASS: unsupported logistics preserves native download/formats, creates no tasks or timers, shows hint with closed panel, supported selection recovers');
 
-// New logistics use only the upper selection and remain visibly experimental.
+// Only Hi-Life/T-Cat/Kerry show the requested trial notice; no-package stays quiet.
 for (const name of ['蝦皮店到店 - 無包裝隔日到','萊爾富','黑貓宅急便','嘉里快遞']) {
  carrierName=name;label.checked=packing.checked=true;thermal.checked=name!=='萊爾富';picklist.checked=false;
  row.innerText='buyer 全家 7-ELEVEN 新竹物流';tick();sent.length=0;native.click();
  const start=sent.findLast(m=>m.type==='START_DOCUMENT_TASK');assert.ok(start,name);
  assert.equal(start.sevenEleven,false);assert.equal(start.familyMart,false);assert.equal(start.expectedFiles,2);
- assert.match(panel.querySelector('.lh-mode-hint').textContent,/試作物流/);assert.equal(panel.querySelector('.lh-mode-hint').hidden,false);
+ const notice=name==='蝦皮店到店 - 無包裝隔日到'?'':'此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報';
+ assert.equal(panel.querySelector('.lh-mode-hint').textContent,notice);assert.equal(panel.querySelector('.lh-mode-hint').hidden,!notice);
+ assert.equal(panel.querySelector('.lh-mode-hint').style.display,notice?'block':'none');
  assert.ok(panel.querySelector('.lh-tasks').innerHTML.includes(name+' 寄件單＋裝箱單'));
 }
-console.log('PASS: four experimental carrier selections, Hi-Life without thermal radio, visible unverified notice and separate PDF flow');
+console.log('PASS: four experimental carrier selections, Hi-Life without thermal radio, exact trial notice for three carriers, no-package notice hidden, separate PDF flow');
