@@ -97,4 +97,10 @@
   border-color:inherit; transform:translateX(-50%) rotate(45deg);
 }
 #lh-print-guide .lh-guide-bubble[data-below="true"]::after { top:-5px; bottom:auto; transform:translateX(-50%) rotate(225deg); }
+#lh-print-guide .lh-guide-bubble[data-side="left"]::after {
+  left:auto; right:-5px; top:50%; bottom:auto; transform:translateY(-50%) rotate(-45deg);
+}
+#lh-print-guide .lh-guide-bubble[data-side="right"]::after {
+  left:-5px; right:auto; top:50%; bottom:auto; transform:translateY(-50%) rotate(135deg);
+}
 @media print { #lh-print-guide { display:none !important; } }

@@ -45,6 +45,7 @@
     // A format cannot be selected until its document checkbox is enabled.
     if (shipping && !shipping.checked) add('shipping', shipping, '勾選寄件單', false);
     else if (thermal) add('thermal', thermal, '選擇「熱感列印」', thermal.checked);
+    else if (shipping) add('shipping', shipping, '勾選寄件單', shipping.checked);
     if (packing && !packing.checked) add('packing', packing, '勾選裝箱單', false);
     else if (pdf) add('pdf', pdf, '選擇「PDF」', pdf.checked);
     result.push({key:'download', control:download, text:'點擊「下載所選文件」', done:false});
@@ -90,15 +91,21 @@
         .map(left => Math.max(8, Math.min(left, right - width - 8)));
       const candidates = [
         ...horizontal.map(left => ({left, top:labelBox.top - height - 9, below:false})),
-        ...horizontal.map(left => ({left, top:labelBox.bottom + 9, below:true}))
+        ...horizontal.map(left => ({left, top:labelBox.bottom + 9, below:true})),
+        // Dense document lists leave no room above or below a checkbox.
+        // Keep the prompt beside its indicator instead of silently hiding it.
+        {left:box.left - width - 9, top:box.top + (box.height - height) / 2, side:'left'},
+        {left:labelBox.right + 9, top:box.top + (box.height - height) / 2, side:'right'}
       ];
       const position = candidates.find(p => {
-        if (p.top < 8 || p.top + height > innerHeight - 8 || center < p.left + 5 || center > p.left + width - 5) return false;
+        if (p.left < 8 || p.left + width > right - 8 || p.top < 8 || p.top + height > innerHeight - 8) return false;
+        if (!p.side && (center < p.left + 5 || center > p.left + width - 5)) return false;
         return ![...controls, ...placed].some(other => p.left < other.right + 3 && p.left + width + 3 > other.left && p.top < other.bottom + 3 && p.top + height + 3 > other.top);
       });
       if (!position) { bubble.hidden = true; return; }
       const {left, top, below} = position;
       bubble.dataset.below = String(below);
+      bubble.dataset.side = position.side || '';
       bubble.style.left = `${Math.round(left)}px`; bubble.style.top = `${Math.round(top)}px`;
       bubble.style.setProperty('--lh-guide-arrow', `${Math.max(12, Math.min(width - 12, box.left + box.width / 2 - left))}px`);
       placed.push({left, right:left + width, top, bottom:top + height});
