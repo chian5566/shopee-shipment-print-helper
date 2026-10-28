@@ -6,7 +6,7 @@
 
 **完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
 
-目前版本：**v0.11.7**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.8**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 操作提示
 
@@ -32,7 +32,7 @@
 
 ### 手動安裝（進階）
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.7/shopee-shipment-print-helper-v0.11.7.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.7 安裝檔</a>（`shopee-shipment-print-helper-v0.11.7.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.8/shopee-shipment-print-helper-v0.11.8.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.8 安裝檔</a>（`shopee-shipment-print-helper-v0.11.8.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
@@ -80,3 +80,5 @@
 失敗任務會顯示 Google 表單回報連結與「查看錯誤詳情」按鈕。點開視窗後可複製版本、失敗時間與階段、錯誤堆疊、文件大小與頁數、裝箱單辨識結果，再貼到回報表單。若無法自動複製，視窗會選取全文供手動複製。原始文件下載連結仍保留。
 
 全家原單以背景分頁開啟，畫面保留在蝦皮出貨頁。全家會在本機讀取原生寄件單圖片內的 QR 訂單編號，裁開已驗證的四格版型，再與裝箱單逐筆配對。全家與其他物流請分開下載；不明版型、QR 無法辨識或訂單不符時停止產生，保留原單供核對。合併文件使用 100 × 150 mm，沿用 125% 列印設定。全家頁面需允許 `api.sls.shopee.tw` 的 `/api/logistic/familymart/shipping_label` 路徑。
+
+物流辨識直接讀取「下載出貨文件」上方目前選取的「物流方式」。任務名稱、7-ELEVEN／全家文件流程與新竹物流排版皆使用下載當下的選項，不從買家、商品或訂單列文字推測；選到「其他寄送方式」時不啟動助手任務、不自動調整列印格式，顯示未支援提示並保留蝦皮原生下載。無法讀取選項時也保留原生下載並顯示提示。
