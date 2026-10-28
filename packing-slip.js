@@ -162,6 +162,61 @@
     } finally {await doc.loadingTask.destroy();}
   }
 
+  // Experimental carriers: require an explicit order ID or the dedicated
+  // tracking-number cell. Never infer pairing from page position or row summaries.
+  function experimentalOrderId(items, knownIds, orders) {
+    const text = items.map(item=>item.str || '').join(' ').toUpperCase();
+    const compactText = text.replace(/\s/g, '');
+    const evidence = new Set(knownIds.filter(id=>compactText.includes(id.toUpperCase())));
+    for (const order of orders) {
+      const tracking = (order.trackingNumber || '').replace(/\s/g, '').toUpperCase();
+      if (!/^[A-Z0-9-]{8,32}$/.test(tracking)) continue;
+      // Keep token boundaries, especially for numeric waybills sharing a prefix.
+      const escaped = tracking.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp('(?:^|[^A-Z0-9-])'+escaped+'(?=$|[^A-Z0-9-])').test(text)) evidence.add(order.orderId);
+    }
+    if (evidence.size !== 1) throw new Error('試作物流寄件單無法唯一配對訂單，請核對原始文件');
+    const id = [...evidence][0];
+    if (!knownIds.includes(id)) throw new Error('試作物流寄件單包含本次範圍外訂單');
+    return id;
+  }
+
+  async function readExperimentalLabels(bytes, pdfjs, knownIds, orders, {grid=false}={}) {
+    const loading = pdfjs.getDocument({data:new Uint8Array(bytes.slice(0)),isEvalSupported:false,enableScripting:false});
+    const doc = await loading.promise;
+    try {
+      const labels=[];
+      for (let pageIndex=0;pageIndex<doc.numPages;pageIndex++) {
+        const page=await doc.getPage(pageIndex+1),items=(await page.getTextContent()).items.filter(item=>item.str?.trim());
+        const [left,bottom,right,top]=page.view,width=right-left,height=top-bottom;
+        if (![left,bottom,right,top].every(Number.isFinite) || width<=0 || height<=0) throw new Error('試作物流寄件單尺寸無效');
+        const a4=Math.abs(width-595.28)<4 && Math.abs(height-841.89)<4;
+        let regions=[{x:left,y:bottom,width,height}];
+        if (grid && a4) {
+          if (page.rotate!==0) throw new Error('萊爾富四格寄件單旋轉版型尚未驗證，請使用原始文件');
+          regions=[{x:left,y:bottom+height/2,width:width/2,height:height/2},{x:left+width/2,y:bottom+height/2,width:width/2,height:height/2},
+            {x:left,y:bottom,width:width/2,height:height/2},{x:left+width/2,y:bottom,width:width/2,height:height/2}];
+        } else if (grid && !(width<=330 && height<=460)) {
+          throw new Error('萊爾富寄件單版型尚未驗證，僅試作單張熱感 PDF 或直式 A4 四格 PDF');
+        }
+        if (!items.length) throw new Error('試作物流寄件單沒有可辨識文字，請使用原始文件');
+        for (const crop of regions) {
+          const cell=items.filter(item=>item.transform[4]>=crop.x && item.transform[4]<crop.x+crop.width && item.transform[5]>=crop.y && item.transform[5]<crop.y+crop.height);
+          if (!cell.length) continue;
+          // Refuse text crossing a grid boundary instead of clipping another label.
+          if (regions.length>1 && cell.some(item=>item.transform[4]+Math.abs(item.width)>crop.x+crop.width+1 || item.transform[5]+Math.abs(item.height)>crop.y+crop.height+1)) {
+            throw new Error('萊爾富寄件單內容超出四格範圍，請使用原始文件');
+          }
+          labels.push({orderId:experimentalOrderId(cell,knownIds,orders),pageIndex,crop});
+        }
+      }
+      if (labels.length!==knownIds.length || new Set(labels.map(item=>item.orderId)).size!==knownIds.length || knownIds.some(id=>!labels.some(item=>item.orderId===id))) {
+        throw new Error('試作物流寄件單數量、重複或訂單範圍不符，已停止產生');
+      }
+      return labels;
+    } finally {await loading.destroy();}
+  }
+
   async function readPacking(bytes, pdfjs) {
     const loading = pdfjs.getDocument({data:new Uint8Array(bytes.slice(0)),isEvalSupported:false,enableScripting:false,useSystemFonts:false});
     const doc = await loading.promise;
@@ -283,6 +338,6 @@
     }
   }
 
-  root.LHPackingSlip={PAPER,PRINT_COMPENSATION,PRINT_MARGIN,extractRows,extractBuyerNote,extractOrderId,extractPackingSections,matchPackingToLabels,readLabelOrderIds,readPacking,appendRows,wrap};
+  root.LHPackingSlip={PAPER,PRINT_COMPENSATION,PRINT_MARGIN,extractRows,extractBuyerNote,extractOrderId,extractPackingSections,matchPackingToLabels,readLabelOrderIds,readExperimentalLabels,readPacking,appendRows,wrap};
   if (typeof module !== 'undefined') module.exports=root.LHPackingSlip;
 })(globalThis);
