@@ -144,10 +144,29 @@ for (const hidden of [false,true]) {
  assert.match(panel.querySelector('.lh-mode-hint').textContent,/上方選取的物流方式/);
 }
 filterVisible=true;carrierInput.checked=true;
-for (const name of ['蝦皮店到店 - 隔日到貨','蝦皮店到店','店到家宅配','其他寄送方式']) {
+for (const name of ['蝦皮店到店 - 隔日到貨','蝦皮店到店','店到家宅配']) {
  carrierName=name;thermal.checked=true;tick();sent.length=0;native.click();
  assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').sevenEleven,false);
  assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').familyMart,false);
  assert.ok(panel.querySelector('.lh-tasks').innerHTML.includes(name+' 寄件單＋裝箱單'));
 }
 console.log('PASS: all upper-filter modes, misleading row keywords ignored, missing/hidden selection preserves native download');
+
+// Unsupported logistics never starts a task or changes native format choices.
+carrierName='其他寄送方式';row.innerText='buyer 新竹物流 全家 7-ELEVEN';
+for (const thermalChoice of [false,true]) for (const documents of [false,true]) {
+ thermal=control('radio','C2C_SHIPPING_LABEL_THERMAL',thermalChoice);
+ packingPdf.checked=false;label.checked=packing.checked=documents;
+ const clicksBefore=thermal.clicks,nativeBefore=nativeRuns,waitsBefore=timeouts.filter(t=>t.delay===90000).length;
+ tick();assert.equal(thermal.checked,thermalChoice);assert.equal(thermal.clicks,clicksBefore);assert.equal(packingPdf.checked,false);
+ assert.match(panel.querySelector('.lh-mode-hint').textContent,/此物流方式尚未支援，請使用蝦皮原生下載/);
+ sent.length=0;native.click();assert.equal(nativeRuns,nativeBefore+1);
+ assert.ok(!sent.some(m=>m.type==='START_DOCUMENT_TASK'));
+ assert.equal(timeouts.filter(t=>t.delay===90000).length,waitsBefore);
+ assert.equal(attributes['data-lh-background-task'],undefined);
+}
+panel.remove();native.click();assert.ok(panel.isConnected);
+assert.match(panel.querySelector('.lh-mode-hint').textContent,/此物流方式尚未支援/);
+carrierName='蝦皮店到店';label.checked=packing.checked=true;tick();sent.length=0;native.click();
+assert.ok(sent.some(m=>m.type==='START_DOCUMENT_TASK'));
+console.log('PASS: unsupported logistics preserves native download/formats, creates no tasks or timers, shows hint with closed panel, supported selection recovers');

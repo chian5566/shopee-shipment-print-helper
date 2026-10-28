@@ -152,12 +152,15 @@
     return clean(name?.textContent || label.innerText).replace(/\s*[（(]\s*\d+\s*[)）]\s*$/, '');
   }
 
+  const UNSUPPORTED_CARRIER_HINT = '此物流方式尚未支援，請使用蝦皮原生下載。';
+
   function assistantMode() {
     if (!isDownloadPage()) return {enabled:false,hint:PAGE_HINT};
+    const carrierName = selectedCarrier();
+    if (carrierName === '其他寄送方式') return {enabled:false,hint:UNSUPPORTED_CARRIER_HINT};
     if (!documentCheckbox('寄件單')?.checked || !documentCheckbox('裝箱單')?.checked) {
       return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
     }
-    const carrierName = selectedCarrier();
     if (!carrierName) return {enabled:false,hint:'尚未讀取到上方選取的物流方式，請重新選擇物流方式。'};
     if (/^7-ELEVEN$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,sevenEleven:true};
     if (/^(全家|FamilyMart)$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,familyMart:true};
@@ -190,7 +193,7 @@
     renderMode();renderTasks();
     const mode=assistantMode();
     if (!mode.enabled) {
-      if (mode.hint===THERMAL_HINT && !panel?.isConnected) makePanel();
+      if ([THERMAL_HINT,UNSUPPORTED_CARRIER_HINT].includes(mode.hint) && !panel?.isConnected) makePanel();
       return;
     }
     const orders=selectedOrders();
@@ -429,6 +432,7 @@
 
   function configureShopeeDefaults() {
     if (!isDownloadPage()) { renderMode(); return; }
+    if (selectedCarrier() === '其他寄送方式') { renderMode(); return; }
     const header = document.querySelector('.mass-ship-header input[type="checkbox"]');
     // Select all only on initial setup. A later manual deselection must stay deselected.
     if (!defaultsApplied && header && !header.disabled) {
