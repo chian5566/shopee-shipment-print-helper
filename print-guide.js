@@ -45,6 +45,7 @@
     // A format cannot be selected until its document checkbox is enabled.
     if (shipping && !shipping.checked) add('shipping', shipping, '勾選寄件單', false);
     else if (thermal) add('thermal', thermal, '選擇「熱感列印」', thermal.checked);
+    else if (shipping) add('shipping', shipping, '勾選寄件單', shipping.checked);
     if (packing && !packing.checked) add('packing', packing, '勾選裝箱單', false);
     else if (pdf) add('pdf', pdf, '選擇「PDF」', pdf.checked);
     result.push({key:'download', control:download, text:'點擊「下載所選文件」', done:false});
