@@ -27,10 +27,20 @@ test('guide points to missing document checkboxes then formats, reflects manual 
 });
 test('carrier remount skips unavailable formats and ignores hidden duplicate',()=>{
  const f=fixture();f.shipping.checked=f.packing.checked=true;f.setThermal(false);f.tick();
- assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單','3. 點擊「下載所選文件」','2. 選擇「PDF」']);
+ assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單','2. 勾選寄件單 ✓','4. 點擊「下載所選文件」','3. 選擇「PDF」']);
  f.setThermal(true);f.setHidden(true);f.tick();assert.equal(f.visible().find(x=>x.textContent.includes('熱感')).dataset.done,'false');
  f.setPdf(false);f.tick();assert.ok(!f.visible().some(x=>x.textContent.includes('PDF')));
  f.context.location.pathname='/portal/product/list/live';f.tick();assert.equal(f.visible().length,0);
+});
+test('7-ELEVEN keeps shipping as step two before and after checking without a thermal option',()=>{
+ const f=fixture();f.setThermal(false);f.packing.checked=f.pdf.checked=true;f.tick();
+ assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單' && b.dataset.done==='false'));
+ f.shipping.checked=true;f.handlers.change();
+ assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單 ✓' && b.dataset.done==='true'));
+ assert.ok(f.visible().some(b=>b.textContent==='3. 選擇「PDF」 ✓'));
+ assert.ok(f.visible().some(b=>b.textContent==='4. 點擊「下載所選文件」'));
+ f.shipping.checked=false;f.handlers.change();
+ assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單'));
 });
 test('scroll hides offscreen targets and guide never overlaps its own bubbles',()=>{
  const f=fixture();const bubbles=f.visible();
@@ -48,4 +58,22 @@ test('bubble avoids adjacent document label while arrow stays aligned to radio',
  const bubble=f.visible().find(b=>b.textContent.includes('PDF'));
  assert.ok(bubble);assert.equal(bubble.dataset.below,'true');
  const center=328,left=parseFloat(bubble.style.left);assert.ok(center>=left+5&&center<=left+bubble.offsetWidth-5);
+});
+
+test('dense 7-ELEVEN document list keeps shipping prompt visible beside checkbox',()=>{
+ const f=fixture();f.setThermal(false);
+ const rect=(top,width=150)=>({left:320,right:320+width,top,bottom:top+22,width,height:22});
+ const move=(input,top)=>{
+  const label=input.closest('label');label.getBoundingClientRect=()=>rect(top);
+  label.querySelector().getBoundingClientRect=()=>rect(top,16);
+ };
+ move(f.shipping,360);move(f.packing,392);
+ const preceding={closest:()=>null,getClientRects:()=>[rect(328)],getBoundingClientRect:()=>rect(328)};
+ f.setControls([preceding,f.shipping,f.packing]);f.tick();
+ const shipping=f.visible().find(b=>b.textContent==='2. 勾選寄件單');
+ assert.ok(shipping,'second step must not disappear when adjacent labels block vertical placements');
+ assert.equal(shipping.dataset.side,'left');
+ assert.ok(parseFloat(shipping.style.left)+shipping.offsetWidth<320);
+ f.shipping.checked=true;f.tick();
+ assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單 ✓'));
 });
