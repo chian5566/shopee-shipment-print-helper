@@ -6,7 +6,7 @@
 
 **完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
 
-目前版本：**v0.11.8**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.9**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 操作提示
 
@@ -22,9 +22,19 @@
 | 7-ELEVEN | ✅ |
 | 新竹物流 | ✅ |
 | 全家 | ✅（單筆實機已驗證，多筆待實單測試） |
+| 蝦皮店到店 - 無包裝隔日到 | 🧪 沿用店到店熱感 PDF 流程 |
+| 萊爾富 | 🧪 單張熱感／直式 A4 四格 PDF |
+| 黑貓宅急便 | 🧪 原單 PDF 等比例排版 |
+| 嘉里快遞 | 🧪 原單 PDF 等比例排版 |
 | 其他寄送方式 | ❌ |
 
-✅ 可由助手整理寄件單與裝箱單；❌ 尚未支援，請使用蝦皮原本的下載方式。
+✅ 可由助手整理寄件單與裝箱單；🧪 自 v0.11.9 加入測試支援，四種新物流均未經實單下載、列印或掃碼驗證；❌ 尚未支援，請使用蝦皮原本的下載方式。
+
+萊爾富、黑貓宅急便與嘉里快遞在助手訂單清單下方顯示「此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報」；無包裝隔日到不顯示測試提示。
+
+試作僅接收蝦皮 `/awbprint` PDF 預覽；萊爾富不共用 7-ELEVEN 的外部網站與網頁擷取器。若來源是外部網頁、影像 PDF、未知版型，或訂單／取件編號無法唯一配對，停止合併並請使用原始文件。萊爾富四格分單先依 PDF 上的訂單或專用取件編號欄位配對，沒有可辨識編號時不依頁面順序猜測。黑貓與嘉里逐張配對並沿用新竹的向量原單等比例排版；無包裝隔日到沿用既有店到店流程，若出現一單多張而無法唯一配對仍會停止。
+
+萊爾富版面研究參考：[蝦皮官方出貨手冊（2020，頁 21 的四格列印示意）](https://cdngarenanow-a.akamaihd.net/shopee/seller/seller_cms/7e6ee99bb562f0a699cf0b5580cf867d/%E8%90%8A%E7%88%BE%E5%AF%8C%E8%B6%85%E5%95%86%E7%89%A9%E6%B5%81%E5%87%BA%E8%B2%A8%E6%89%8B%E5%86%8A.pdf)。舊手冊僅作試作版面依據，不代表已確認現行單據相同。
 
 ## 安裝
 
@@ -32,7 +42,7 @@
 
 ### 手動安裝（進階）
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.8/shopee-shipment-print-helper-v0.11.8.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.8 安裝檔</a>（`shopee-shipment-print-helper-v0.11.8.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.9/shopee-shipment-print-helper-v0.11.9.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.9 安裝檔</a>（`shopee-shipment-print-helper-v0.11.9.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。

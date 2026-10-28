@@ -15,8 +15,8 @@
     if (rotation === 270) x += h;
     return { x, y, width: w, height: h, rotation: -rotation, visibleWidth, visibleHeight };
   }
-  async function appendPackingPage(out, sourcePage, PDFLib, contentRatio = 0.76) {
-    const crop = sourcePage.getCropBox();
+  async function appendPackingPage(out, sourcePage, PDFLib, contentRatio = 0.76, region = null) {
+    const crop = region || sourcePage.getCropBox();
     const media = sourcePage.getMediaBox();
     const box = { left: Math.max(crop.x, media.x), bottom: Math.max(crop.y, media.y), right: Math.min(crop.x + crop.width, media.x + media.width), top: Math.min(crop.y + crop.height, media.y + media.height) };
     if (box.right <= box.left || box.top <= box.bottom) throw new Error('裝箱單頁面尺寸無效');
@@ -29,9 +29,9 @@
   function isHctOrder(order) {
     return /新竹(?:物流|貨運)|\bHCT\b/i.test(order?.summary || '');
   }
-  async function appendHctLabel(out, sourcePage, PDFLib) {
+  async function appendHctLabel(out, sourcePage, PDFLib, region = null) {
     // Preserve vector text/barcodes; normalize crop/rotation to 100 x 150 mm.
-    const page = await appendPackingPage(out, sourcePage, PDFLib, 1);
+    const page = await appendPackingPage(out, sourcePage, PDFLib, 1, region);
     // 80% in the PDF x 125% in the print dialog = original fitted size.
     // Match the top-left print origin used by packing slips and 7-ELEVEN.
     page.scaleContent(0.8, 0.8);

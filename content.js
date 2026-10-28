@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.8';
+  const VERSION = '0.11.9';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -67,7 +67,8 @@
       const packageId = link?.getAttribute('href')?.match(/\/order\/(\d+)/)?.[1] || '';
       const parts = clean(row.innerText).split(' ').filter(Boolean);
       const summary = parts.filter((part) => !['寄件單', '裝箱單', '撿貨單', orderId].includes(part)).join(' ');
-      return orderId ? { orderId, packageId, summary } : null;
+      const trackingNumber = clean(row.querySelector('.tracking-number')?.textContent).replace(/\s+/g, '');
+      return orderId ? { orderId, packageId, summary, trackingNumber } : null;
     }).filter(Boolean);
   }
 
@@ -162,10 +163,13 @@
       return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
     }
     if (!carrierName) return {enabled:false,hint:'尚未讀取到上方選取的物流方式，請重新選擇物流方式。'};
+    const experimental = /^(蝦皮店到店\s*[-－–—]\s*無包裝隔日到|萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName);
+    const experimentalHint = /^(萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName) ? '此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報' : '';
+    if (carrierName === '萊爾富') return {enabled:true,hint:experimentalHint,carrierName,experimental:true,experimentalPdf:true,hilife:true};
     if (/^7-ELEVEN$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,sevenEleven:true};
     if (/^(全家|FamilyMart)$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,familyMart:true};
     if (!thermalLabelSelected()) return {enabled:false,hint:THERMAL_HINT};
-    return {enabled:true,hint:'',carrierName};
+    return {enabled:true,hint:experimentalHint,carrierName,experimental,experimentalPdf:/^(黑貓宅急便|嘉里快遞)$/.test(carrierName)};
   }
 
   function renderMode() {
@@ -176,8 +180,9 @@
     if (mode.hint===PAGE_HINT) {
       hint.innerHTML=`請前往蝦皮「<a href="${DOWNLOAD_PAGE_URL}" style="color:inherit;text-decoration:underline">批次出貨 → 下載出貨文件</a>」頁面使用出貨助手。`;
     }
-    hint.hidden=mode.enabled;
-    hint.style?.setProperty('display',mode.enabled?'none':'block','important');
+    const visible = !mode.enabled || Boolean(mode.hint);
+    hint.hidden=!visible;
+    hint.style?.setProperty('display',visible?'block':'none','important');
   }
 
   function handleNativeDownload(event) {
@@ -204,14 +209,14 @@
     }
     const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?(documentCheckbox('撿貨單')?.checked?2:1):2;
     const carrierName=mode.carrierName+' ';
-    const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,carrierName:mode.carrierName,sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
+    const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,carrierName:mode.carrierName,experimental:Boolean(mode.experimental),experimentalPdf:Boolean(mode.experimentalPdf),hilife:Boolean(mode.hilife),sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
     if(task.familyMart)document.documentElement.setAttribute('data-lh-family-background-task',task.id);
     if(task.sevenEleven)document.documentElement.setAttribute('data-lh-seven-background-task',task.id);
     chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,familyMart:task.familyMart,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
-    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:'尚未取得完整文件，請重新下載。');},90000);
+    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:(task.experimental?'此試作物流尚未取得完整 PDF，請使用蝦皮原始文件；外部網頁寄件單尚未支援。':'尚未取得完整文件，請重新下載。'));},90000);
   }
 
   function errorInfo(error) {
@@ -226,7 +231,7 @@
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
       receivedFiles:(task.previewFiles || []).map((file,index)=>({file:index+1,bytes:file.bytes?.byteLength || 0})),
-      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.familyMart?'全家':task.sevenEleven?'7-ELEVEN':'Shopee PDF',receivedSevenLabels:task.sevenLabels?.length || 0,
+      documents:task.documentInfo || [],packingChecks:task.packingChecks || [],shippingFormat:task.familyMart?'全家':task.sevenEleven?'7-ELEVEN':'Shopee PDF',carrierName:task.carrierName || '',experimental:Boolean(task.experimental),receivedSevenLabels:task.sevenLabels?.length || 0,
       sevenLabelSizes:(task.sevenLabels || []).map((label,index)=>({label:index+1,width:label.width,height:label.height,sourceWidth:label.sourceWidth,sourceHeight:label.sourceHeight}))
     },null,2);
   }
@@ -367,7 +372,8 @@
       task.stage='配對訂單與寄件單';
       task.additionalUrls=task.sourceUrls.filter((url,index)=>index!==packingIndex&&index!==labelIndex);
       if(task.sevenEleven || task.familyMart)(task.familyMart?globalThis.LHFamilyMart:globalThis.LHSevenEleven).validateLabels(task.sevenLabels,task.orders.map(order=>order.orderId));
-      const labelOrderIds = (task.sevenEleven || task.familyMart)?task.sevenLabels.map(item=>item.orderId):await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
+      const experimentalLabels = task.experimentalPdf ? await globalThis.LHPackingSlip.readExperimentalLabels(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId),task.orders,{grid:task.hilife}) : null;
+      const labelOrderIds = experimentalLabels ? experimentalLabels.map(item=>item.orderId) : (task.sevenEleven || task.familyMart)?task.sevenLabels.map(item=>item.orderId):await globalThis.LHPackingSlip.readLabelOrderIds(files[labelIndex],pdfjs,rowsByPage.map(p=>p.orderId).filter(Boolean),task.orders);
       if (rowsByPage.length!==task.orders.length || task.orders.some(order=>!rowsByPage.some(p=>p.orderId===order.orderId))) throw new Error('裝箱單與本次已選訂單不符，已停止產生');
       const orderedPacking = globalThis.LHPackingSlip.matchPackingToLabels(rowsByPage,labelOrderIds);
       const out = await PDFDocument.create();
@@ -379,7 +385,10 @@
         const packing=orderedPacking[i];
         if(task.sevenEleven || task.familyMart)await (task.familyMart?globalThis.LHFamilyMart:globalThis.LHSevenEleven).appendLabel(out,task.sevenLabels[i],window.PDFLib);
         else {
-          if(task.carrierName==='新竹物流')await globalThis.LHPrintLayout.appendHctLabel(out,label.getPage(i),window.PDFLib);
+          if (experimentalLabels) {
+            const item=experimentalLabels[i];
+            await globalThis.LHPrintLayout.appendHctLabel(out,label.getPage(item.pageIndex),window.PDFLib,item.crop);
+          } else if(task.carrierName==='新竹物流')await globalThis.LHPrintLayout.appendHctLabel(out,label.getPage(i),window.PDFLib);
           else out.addPage((await out.copyPages(label,[i]))[0]);
         }
         await globalThis.LHPackingSlip.appendRows(out,packing.rows,{font,numberFont},window.PDFLib,packing.buyerNote,packing.orderId);
@@ -449,7 +458,7 @@
       if (!input || input.disabled || configuredFormats.has(input)) return;
       configuredFormats.add(input);if (!input.checked) input.click();
     };
-    if(!/^(7-ELEVEN|全家|FamilyMart)$/i.test(selectedCarrier()))defaultFormat('寄件單','C2C_SHIPPING_LABEL_THERMAL');
+    if(!/^(7-ELEVEN|全家|FamilyMart|萊爾富)$/i.test(selectedCarrier()))defaultFormat('寄件單','C2C_SHIPPING_LABEL_THERMAL');
     defaultFormat('裝箱單','PACKING_LIST_PDF');
     renderMode();
   }
