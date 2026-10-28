@@ -6,7 +6,7 @@
 
 **完全免費，以後也不會收費。蝦皮 PDF 僅支援熱感列印；7-ELEVEN、全家使用原生寄件單。**
 
-目前版本：**v0.11.8**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
+目前版本：**v0.11.9**。新增功能與修正請見 <a href="CHANGELOG.md" target="_blank" rel="noopener noreferrer">更新紀錄</a>。
 
 ## 操作提示
 
@@ -28,7 +28,7 @@
 | 嘉里快遞 | 🧪 原單 PDF 等比例排版 |
 | 其他寄送方式 | ❌ |
 
-✅ 可由助手整理寄件單與裝箱單；🧪 僅新分支試作，四種新物流均未經實單下載、列印或掃碼驗證，未納入 GitHub v0.11.8；❌ 尚未支援，請使用蝦皮原本的下載方式。
+✅ 可由助手整理寄件單與裝箱單；🧪 自 v0.11.9 加入測試支援，四種新物流均未經實單下載、列印或掃碼驗證；❌ 尚未支援，請使用蝦皮原本的下載方式。
 
 萊爾富、黑貓宅急便與嘉里快遞在助手訂單清單下方顯示「此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報」；無包裝隔日到不顯示測試提示。
 
@@ -42,7 +42,7 @@
 
 ### 手動安裝（進階）
 
-1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.8/shopee-shipment-print-helper-v0.11.8.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.8 安裝檔</a>（`shopee-shipment-print-helper-v0.11.8.zip`），下載後解壓縮。
+1. <a href="https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.9/shopee-shipment-print-helper-v0.11.9.zip" target="_blank" rel="noopener noreferrer">下載 v0.11.9 安裝檔</a>（`shopee-shipment-print-helper-v0.11.9.zip`），下載後解壓縮。
 2. 在 Chrome 網址列輸入 `chrome://extensions/`，開啟右上角「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾（裡面要有 `manifest.json`）。
 4. 重新整理蝦皮頁面，即可使用。安裝後請保留這個資料夾。
