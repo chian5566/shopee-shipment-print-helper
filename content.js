@@ -221,12 +221,12 @@
 
   function errorInfo(error) {
     if (!error) return null;
-    return {name:String(error.name || 'Error'),message:String(error.message || error),stack:String(error.stack || ''),cause:error.cause ? String(error.cause.message || error.cause) : ''};
+    return {name:String(error.name || 'Error'),message:String(error.message || error),stack:String(error.stack || ''),cause:error.cause ? String(error.cause.message || error.cause) : '',diagnostics:error.diagnostics || null};
   }
 
   function diagnosticText(task) {
     return 'LEISURE HOMME 出貨印單助手｜錯誤回報\n'+JSON.stringify({
-      version:VERSION,startedAt:new Date(task.startedAt).toISOString(),failedAt:task.failedAt ? new Date(task.failedAt).toISOString() : null,
+      reportSchema:2,build:chrome.runtime.getManifest?.().version_name || VERSION,version:VERSION,startedAt:new Date(task.startedAt).toISOString(),failedAt:task.failedAt ? new Date(task.failedAt).toISOString() : null,
       stage:task.stage || '未知階段',message:task.detail,error:task.error || null,
       browser:navigator.userAgent,page:location.origin+location.pathname,
       selectedOrderCount:task.orders?.length || 0,expectedFiles:task.expectedFiles || 0,
