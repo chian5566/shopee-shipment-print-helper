@@ -183,8 +183,22 @@
     return {enabled:true,hint:experimentalHint,carrierName,experimental,experimentalPdf:/^(黑貓宅急便|嘉里快遞)$/.test(carrierName)};
   }
 
+  let activationTag;
+  function renderActivationTag() {
+    const heading = isDownloadPage() && [...document.querySelectorAll('.document-method-select-container .header')]
+      .find(node => clean(node.textContent).startsWith('批次下載'));
+    if (!heading) { activationTag?.remove(); activationTag = null; return; }
+    if (!activationTag) {
+      activationTag = document.createElement('span');
+      activationTag.className = 'lh-assistant-active-tag';
+      activationTag.textContent = '印單助手啟用中';
+    }
+    if (activationTag.parentElement !== heading) heading.append(activationTag);
+  }
+
   const guardedDownloadButtons = new Map();
   function renderDownloadGuard() {
+    renderActivationTag();
     const errors = downloadErrors(), blocked = errors.length > 0;
     const buttons = blocked ? [...document.querySelectorAll('button, [role="button"]')].filter(button =>
       !button.closest?.('#lh-shipment-panel') && clean(button.textContent).replace(/\s/g,'').includes('下載所選文件') &&
