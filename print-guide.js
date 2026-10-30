@@ -52,7 +52,10 @@
     return result;
   }
   function render() {
-    const items = steps();
+    const allItems = steps();
+    // Keep completed steps visible, revealing only the next unfinished step.
+    const next = allItems.findIndex(item => !item.done);
+    const items = next < 0 ? allItems : allItems.slice(0, next + 1);
     if (!items.length) { remove(); return; }
     if (!root?.isConnected) {
       root = document.createElement('div'); root.id = ID;
