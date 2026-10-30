@@ -1,6 +1,6 @@
 {
   "name": "shopee-shipment-print-helper",
-  "version": "0.11.11",
+  "version": "0.11.12",
   "private": true,
   "description": "Local Shopee Taiwan shipping label and packing slip print helper",
   "engines": {
@@ -11,7 +11,7 @@
     "check": "node scripts/check-release.cjs",
     "package": "node scripts/package.cjs",
     "build:pdf": "node scripts/build-pdf-classic.cjs",
-    "test:browser": "node tests/browser-seven-labels.cjs && node tests/browser-pdf-load.cjs"
+    "test:browser": "node tests/browser-download-guard.cjs && node tests/browser-seven-labels.cjs && node tests/browser-pdf-load.cjs"
   },
   "devDependencies": {
     "@pdf-lib/fontkit": "1.1.1",
