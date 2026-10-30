@@ -6,6 +6,12 @@
 
   // Use PDF text coordinates to read columns, never infer quantities from product titles.
   function extractRows(items) {
+    const diagnostic = {parser:'packing-columns-v1',textItemCount:items.length};
+    const fail = (message, detail = {}) => {
+      const error = new Error(message);
+      error.diagnostics = {...diagnostic,...detail};
+      throw error;
+    };
     const text = items.filter(i => i.str?.trim()).map(i => ({
       text: i.str.trim(), x: i.transform[4], y: i.transform[5], width:i.width || 0,
       height: Math.abs(i.height || i.transform[3] || 10), fontName:i.fontName
@@ -30,6 +36,8 @@
       // retaining each complete source fragment's coordinate for column boundaries.
       const band = {items:text.filter(i=>Math.abs(i.y-line.y)<=Math.max(18,line.items[0].height*1.5))};
       const c = Object.fromEntries(Object.entries(names).map(([key,aliases])=>[key,find(band,aliases)]));
+      const matchedColumns=Object.values(c).filter(value=>value!==null).length;
+      if (!diagnostic.headerCandidate || matchedColumns>diagnostic.headerCandidate.matchedColumns) diagnostic.headerCandidate={columns:c,baselineY:line.y,matchedColumns};
       if (Object.values(c).filter(value=>value!==null).length>=2 && (c.index!==null || c.qty!==null)) {
         columns=c;
         const headerItems=band.items.filter(i=>Object.values(names).flat().some(alias=>alias.includes(compact(i.text))));
@@ -37,8 +45,9 @@
       }
     }
     if (!columns) {
-      throw new Error('無法辨識裝箱單欄位，請提供原始裝箱單 PDF 以校正');
+      fail('無法辨識裝箱單欄位，請提供原始裝箱單 PDF 以校正');
     }
+    Object.assign(diagnostic,{columns,headerY:header.y});
     const footer = lines.filter(l => l.y < header.y && /買家備[註注]|賣家備[註注]|訂單備[註注]/.test(compact(l.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join('')))).sort((a,b)=>b.y-a.y)[0];
     const body = text.filter(i=>i.y<header.y-4 && (!footer || i.y>footer.y+3));
     const positions=Object.values(columns).filter(value=>value!==null).sort((a,b)=>a-b);
@@ -57,9 +66,10 @@
       }
       starts=starts.sort((a,b)=>b.y-a.y).filter((start,index,list)=>index===0 || Math.abs(start.y-list[index-1].y)>=3);
     }
-    if (!starts.length) throw new Error('裝箱單未找到商品列，已停止產生');
+    Object.assign(diagnostic,{hasIndex,rowCount:starts.length,sequence:hasIndex ? starts.slice(0,100).map(i=>({value:Number(compact(i.text).replace(/[.)]$/,'')),x:i.x,y:i.y})) : [],sequenceTruncated:hasIndex && starts.length>100});
+    if (!starts.length) fail('裝箱單未找到商品列，已停止產生');
     const rows = starts.map((start,index) => {
-      if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) throw new Error('裝箱單商品序號不連續，無法安全重排');
+      if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) fail('裝箱單商品序號不連續，無法安全重排',{row:index+1,expectedSequence:index+1,actualSequence:Number(compact(start.text).replace(/[.)]$/,''))});
       const bottom = starts[index+1]?.y ?? (footer ? footer.y+3 : -Infinity);
       const group = body.filter(i=>i.y<=start.y+3 && i.y>bottom+3).flatMap(i=>{
         // PDF.js can combine arbitrary specification text and the adjacent quantity.
@@ -80,12 +90,13 @@
       const variantSku=field(columns.variantSku,'');
       const spec=field(columns.spec).normalize('NFKC').replace(/([\u3400-\u9fff!！])\s+(?=[\u3400-\u9fff])/g,'$1').replace(/\s*([,，])\s*/g,' / ');
       const qtyItems=columns.qty===null ? [] : group.filter(i=>i.x>=columns.qty-3 && i.x<rightOf(columns.qty)-3);
-      if (columns.qty!==null && qtyItems.length===0 && group.some(i=>columns.spec!==null && i.x>=columns.spec-3 && i.x<rightOf(columns.spec)-3 && /^(.+?)\s+(\d+)$/u.test(i.text))) throw new Error(`第 ${index+1} 列數量不完整或位置不明，已停止產生`);
+      Object.assign(diagnostic,{row:index+1,quantityTokenCount:qtyItems.length,quantityPositions:qtyItems.slice(0,10).map(i=>({x:i.x,y:i.y,width:i.width}))});
+      if (columns.qty!==null && qtyItems.length===0 && group.some(i=>columns.spec!==null && i.x>=columns.spec-3 && i.x<rightOf(columns.spec)-3 && /^(.+?)\s+(\d+)$/u.test(i.text))) fail(`第 ${index+1} 列數量不完整或位置不明，已停止產生`,{row:index+1});
       const qty=qtyItems.length===0 ? null : qtyItems.length===1 ? Number(compact(qtyItems[0].text)) : NaN;
       if (qty!==null && (qtyItems.length!==1 || !/^\d+$/.test(compact(qtyItems[0].text)) || !Number.isSafeInteger(qty) || qty<1)) {
-        throw new Error(`第 ${index+1} 列數量不完整或無效，已停止產生`);
+        fail(`第 ${index+1} 列數量不完整或無效，已停止產生`,{row:index+1});
       }
-      if (!hasIndex && qty===null && starts.length>1) throw new Error(`第 ${index+1} 列數量不完整且商品列邊界不明，已停止產生`);
+      if (!hasIndex && qty===null && starts.length>1) fail(`第 ${index+1} 列數量不完整且商品列邊界不明，已停止產生`,{row:index+1});
       const name=field(columns.name).normalize('NFKC').replace(/([\u3400-\u9fff])\s+(?=[\u3400-\u9fff])/g,'$1');
       return {sku,variantSku,name,spec,qty};
     });
@@ -127,11 +138,19 @@
     anchors.sort((a,b)=>b.y-a.y);
     // Keep the no-ID path for column diagnostics; document identification still
     // requires a nonempty, unique order ID before pairing with shipping labels.
-    if (!anchors.length) return [{rows:extractRows(items),buyerNote:extractBuyerNote(items),orderId:''}];
+    if (!anchors.length) {
+      try {return [{rows:extractRows(items),buyerNote:extractBuyerNote(items),orderId:''}];}
+      catch (error) {error.diagnostics={...error.diagnostics,section:1,sectionsOnPage:1,orderIdPresent:false};throw error;}
+    }
     return anchors.map((anchor,index)=>{
       const bottom=anchors[index+1]?.y ?? -Infinity;
       const section=items.filter(i=>i.transform[5]<=anchor.y+3 && i.transform[5]>bottom+3);
-      return {rows:extractRows(section),buyerNote:extractBuyerNote(section),orderId:anchor.orderId};
+      try {
+        return {rows:extractRows(section),buyerNote:extractBuyerNote(section),orderId:anchor.orderId};
+      } catch (error) {
+        error.diagnostics={...error.diagnostics,section:index+1,sectionsOnPage:anchors.length,sectionTopY:anchor.y,sectionBottomY:Number.isFinite(bottom)?bottom:null,orderIdPresent:true};
+        throw error;
+      }
     });
   }
 
@@ -223,8 +242,13 @@
     try {
       const pages=[];
       for (let n=1;n<=doc.numPages;n++) {
-        const items=(await (await doc.getPage(n)).getTextContent()).items;
-        pages.push(...extractPackingSections(items));
+        try {
+          const items=(await (await doc.getPage(n)).getTextContent()).items;
+          pages.push(...extractPackingSections(items));
+        } catch (error) {
+          error.diagnostics={...error.diagnostics,page:n,totalPages:doc.numPages,completedPages:n-1,completedSections:pages.length,completedRows:pages.reduce((sum,section)=>sum+section.rows.length,0)};
+          throw error;
+        }
       }
       return pages;
     } finally { await doc.loadingTask.destroy(); }
