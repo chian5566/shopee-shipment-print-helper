@@ -16,9 +16,9 @@ function setup(){
 }
 
 test('failed tasks retain detailed errors and show the report link without exposing buyer/file data',()=>{
- const s=setup(),error=new Error('bad <script>');s.context.api.failTask(s.task,'合併失敗：bad <script>',error);
+ const s=setup(),error=new Error('bad <script>');error.diagnostics={page:6,expectedSequence:1,actualSequence:5};s.context.api.failTask(s.task,'合併失敗：bad <script>',error);
  assert.match(s.slot.innerHTML,/forms.gle\/TaJMxYJGf8wVDF7T8/);assert.match(s.slot.innerHTML,/查看錯誤詳情/);assert.match(s.slot.innerHTML,/&lt;script>/);
- assert.equal(s.task.error.stack,error.stack);assert.equal(s.task.failed,true);assert.equal(s.messages[0].type,'STOP_DOCUMENT_TASK');
+ assert.equal(s.task.error.diagnostics.page,6);assert.match(s.context.api.diagnosticText(s.task),/actualSequence/);assert.equal(s.task.error.stack,error.stack);assert.equal(s.task.failed,true);assert.equal(s.messages[0].type,'STOP_DOCUMENT_TASK');
  const text=s.context.api.diagnosticText(s.task);assert.match(text,/Test browser|辨識裝箱單|第 2 列不完整/);assert.doesNotMatch(text,/private buyer|secret=token|250101TEST0001/);
  s.task.cancelled=true;s.context.api.renderTasks();assert.doesNotMatch(s.slot.innerHTML,/查看錯誤詳情|回報到 Google/);
 });
