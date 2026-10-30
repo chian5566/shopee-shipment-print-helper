@@ -197,6 +197,7 @@
       else button.setAttribute('aria-disabled', state.ariaDisabled);
       if (state.describedBy === null) button.removeAttribute('aria-describedby');
       else button.setAttribute('aria-describedby', state.describedBy);
+      button.removeAttribute('data-lh-download-blocked');
       state.note.remove();
       guardedDownloadButtons.delete(button);
     }
@@ -215,6 +216,7 @@
       // Vue can enable a formerly native-disabled button after orders change.
       if (!button.disabled) state.disabledByGuard = true;
       button.disabled = true;
+      button.setAttribute('data-lh-download-blocked', 'true');
       button.setAttribute('aria-disabled', 'true');
       const message = errors.join('\n');
       if (state.note.textContent !== message) state.note.textContent = message;
