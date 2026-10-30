@@ -172,7 +172,52 @@
     return {enabled:true,hint:experimentalHint,carrierName,experimental,experimentalPdf:/^(黑貓宅急便|嘉里快遞)$/.test(carrierName)};
   }
 
+  const PICKLIST_HINT = '請取消勾選「撿貨單」，再下載寄件單與裝箱單。';
+  const guardedDownloadButtons = new Map();
+  function picklistDownloadBlocked() {
+    return isDownloadPage() && Boolean(documentCheckbox('撿貨單')?.checked);
+  }
+
+  function renderDownloadGuard() {
+    const blocked = picklistDownloadBlocked();
+    const buttons = blocked ? [...document.querySelectorAll('button, [role="button"]')].filter(button =>
+      !button.closest?.('#lh-shipment-panel') && clean(button.textContent).replace(/\s/g,'').includes('下載所選文件') &&
+      (!button.getClientRects || button.getClientRects().length > 0)) : [];
+    for (const [button, state] of guardedDownloadButtons) {
+      if (buttons.includes(button)) continue;
+      // Only restore the disabled state owned by this guard.
+      if (state.disabledByGuard) button.disabled = false;
+      if (state.ariaDisabled === null) button.removeAttribute('aria-disabled');
+      else button.setAttribute('aria-disabled', state.ariaDisabled);
+      if (state.describedBy === null) button.removeAttribute('aria-describedby');
+      else button.setAttribute('aria-describedby', state.describedBy);
+      state.note.remove();
+      guardedDownloadButtons.delete(button);
+    }
+    for (const button of buttons) {
+      let state = guardedDownloadButtons.get(button);
+      if (!state) {
+        const note = document.createElement('div');
+        note.id = 'lh-download-error-' + (++downloadGuardId);
+        note.className = 'lh-download-error';
+        note.setAttribute('role', 'alert');
+        note.textContent = PICKLIST_HINT;
+        state = {note, disabledByGuard:!button.disabled, ariaDisabled:button.getAttribute('aria-disabled'), describedBy:button.getAttribute('aria-describedby')};
+        guardedDownloadButtons.set(button, state);
+        document.documentElement.append(note);
+        button.setAttribute('aria-describedby', [state.describedBy, note.id].filter(Boolean).join(' '));
+      }
+      if (state.disabledByGuard) button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+      const rect = button.getBoundingClientRect();
+      state.note.style.top = (rect.bottom + 6) + 'px';
+      state.note.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 328)) + 'px';
+    }
+  }
+  let downloadGuardId = 0;
+
   function renderMode() {
+    renderDownloadGuard();
     const hint=panel?.isConnected && panel.querySelector('.lh-mode-hint');
     if (!hint) return;
     const mode=assistantMode();
@@ -188,7 +233,12 @@
   function handleNativeDownload(event) {
     if (!isDownloadPage()) return;
     const native=event.target?.closest?.('button, [role="button"]');
-    if(!native || native.disabled || !clean(native.textContent).replace(/\s/g,'').includes('下載所選文件'))return;
+    if(!native || !clean(native.textContent).replace(/\s/g,'').includes('下載所選文件'))return;
+    // Check again at capture time, including newly mounted buttons before polling.
+    if (picklistDownloadBlocked()) {
+      event.preventDefault();event.stopImmediatePropagation();renderDownloadGuard();return;
+    }
+    if(native.disabled)return;
     if (activeTask && !activeTask.combinedUrl && !activeTask.failed) {
       cancelTask(activeTask);
     }
@@ -506,6 +556,8 @@
   });
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);
-  document.addEventListener('change', () => window.setTimeout(configureShopeeDefaults, 0));
+  document.addEventListener('change', () => { renderDownloadGuard();window.setTimeout(configureShopeeDefaults, 0); });
+  window.addEventListener('scroll', renderDownloadGuard, true);
+  window.addEventListener('resize', renderDownloadGuard);
   window.setInterval(configureShopeeDefaults, 250);
 })();

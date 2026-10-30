@@ -4,7 +4,7 @@ const intervals=[],timeouts=[],events={},sent=[];let selected=false,runtimeListe
 function control(type,value,checked=false){return {type,value,checked,disabled:false,clicks:0,click(){this.clicks++;this.checked=type==='radio'?true:!this.checked;if(this===header)selected=this.checked;},closest(selector){return selector==='label'?{innerText:value,parentElement:{innerText:value}}:null;}};}
 const header=control('checkbox','all'),label=control('checkbox','寄件單'),packing=control('checkbox','裝箱單'),picklist=control('checkbox','撿貨單'),packingPdf=control('radio','PACKING_LIST_PDF');let thermal=control('radio','C2C_SHIPPING_LABEL_THERMAL');
 const row={innerText:'buyer TW000000000000',querySelector(selector){if(selector.includes('checkbox'))return selected?{}:null;return {textContent:'250101TEST0002',getAttribute:()=>'/portal/sale/order/123'};}};
-const listeners=[];let nativeRuns=0;const native={textContent:'下載所選文件',dataset:{},addEventListener:(type,fn)=>listeners.push(fn),closest(){return this;},click(){events.click?.({target:this});for(const fn of listeners)fn({preventDefault(){throw Error('must not prevent native download')},stopPropagation(){throw Error('must not stop native download')}});nativeRuns++;}};
+const listeners=[];let nativeRuns=0;const native={textContent:'下載所選文件',dataset:{},addEventListener:(type,fn)=>listeners.push(fn),closest(){return this;},click(){let blocked=false;events.click?.({target:this,preventDefault(){blocked=true;},stopImmediatePropagation(){blocked=true;}});if(blocked)return;for(const fn of listeners)fn({preventDefault(){throw Error('must not prevent native download')},stopPropagation(){throw Error('must not stop native download')}});nativeRuns++;}};
 let pushed=false,resizes=0;const classes={add(){pushed=true;},remove(){pushed=false;}};
 function makePanel(){const slots=Object.fromEntries(['.lh-orders','.lh-count','.lh-tasks','.lh-mode-hint','.lh-close','.lh-clear-tasks'].map(k=>[k,{textContent:'',innerHTML:'',hidden:false,style:{setProperty(name,value,priority){this[name]=value;this.priority=priority;}},querySelectorAll:()=>[]} ]));return {id:'',innerHTML:'',isConnected:false,querySelector:key=>slots[key],remove(){this.isConnected=false;}};}
 let carrierName='蝦皮店到店', filterVisible=true;
@@ -56,8 +56,8 @@ assert.equal(sent.some(m=>m.type==='START_DOCUMENT_TASK'),false);
 // A disabled/unavailable thermal option cannot enable the helper.
 thermal.checked=true;thermal.disabled=true;tick();assert.equal(panel.querySelector('.lh-mode-hint').hidden,false);thermal.disabled=false;
 thermal.checked=true;tick();assert.equal(panel.querySelector('.lh-mode-hint').hidden,true);
-// Selecting an extra file does not disable the helper.
-thermal.checked=true;picklist.checked=true;tick();assert.ok(panel.querySelector('.lh-mode-hint').hidden);assert.ok(picklist.checked);sent.length=0;native.click();assert.ok(sent.some(m=>m.type==='START_DOCUMENT_TASK'));assert.equal(sent.find(m=>m.type==='START_DOCUMENT_TASK').expectedFiles,2);
+// A picklist blocks the native download without starting/cancelling a task.
+thermal.checked=true;picklist.checked=true;tick();assert.ok(panel.querySelector('.lh-mode-hint').hidden);assert.ok(picklist.checked);sent.length=0;const runsBeforePicklist=nativeRuns;native.click();assert.equal(nativeRuns,runsBeforePicklist);assert.equal(sent.length,0);
 picklist.checked=false;
 // A new radio or a fresh order-selection cycle receives a default once.
 thermal=control('radio','C2C_SHIPPING_LABEL_THERMAL');tick();assert.ok(thermal.checked);
@@ -121,7 +121,7 @@ assert.equal(attributes['data-lh-seven-background-task'],sevenStart.taskId);
 windowEvents.message({source:window,data:{source:'lh-print',type:'BACKGROUND_SEVEN_PREVIEW',taskId:sevenStart.taskId,url:'https://epayment.7-11.com.tw/C2C/C2CWeb/MultiplePrintC2CPinCode.aspx'}});
 assert.ok(sent.some(m=>m.type==='OPEN_BACKGROUND_SEVEN_PREVIEW' && m.taskId===sevenStart.taskId));
 const beforeSevenBridge=sent.length;windowEvents.message({source:{},data:{source:'lh-print',type:'BACKGROUND_SEVEN_PREVIEW',taskId:sevenStart.taskId,url:'https://example.com'}});assert.equal(sent.length,beforeSevenBridge);
-picklist.checked=true;sent.length=0;native.click();assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').expectedFiles,2);
+picklist.checked=true;sent.length=0;native.click();assert.equal(sent.length,0);picklist.checked=false;
 const otherRow={...row,innerText:'buyer 蝦皮店到店',querySelector(selector){if(selector.includes('checkbox'))return {};return {textContent:'250101TEST0003',getAttribute:()=>'/portal/sale/order/124'};}};
 document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();sent.length=0;native.click();assert.ok(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').sevenEleven);
 console.log('PASS: 7-ELEVEN HTML mode, packing/picklist counts, thermal unchanged, order text ignored');
@@ -133,7 +133,7 @@ console.log('PASS: HCT task title includes carrier; task title uses upper filter
 // FamilyMart has no thermal radio; its image original plus packing PDF are supported.
 document.querySelectorAll=originalQueries;carrierName='全家';row.innerText='7-ELEVEN buyer 新竹物流';thermal.checked=false;picklist.checked=false;tick();sent.length=0;native.click();
 const familyStart=sent.findLast(m=>m.type==='START_DOCUMENT_TASK');assert.ok(familyStart.familyMart);assert.equal(attributes['data-lh-family-background-task'],familyStart.taskId);windowEvents.message({source:window,data:{source:'lh-print',type:'BACKGROUND_FAMILY_PREVIEW',taskId:familyStart.taskId,url:'https://api.sls.shopee.tw/api/logistic/familymart/shipping_label?jwt=demo'}});assert.ok(sent.some(m=>m.type==='OPEN_BACKGROUND_FAMILY_PREVIEW'));assert.equal(familyStart.sevenEleven,false);assert.equal(familyStart.expectedFiles,1);assert.match(panel.querySelector('.lh-tasks').innerHTML,/全家 寄件單/);
-picklist.checked=true;sent.length=0;native.click();assert.equal(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').expectedFiles,2);
+picklist.checked=true;sent.length=0;native.click();assert.equal(sent.length,0);picklist.checked=false;
 document.querySelectorAll=selector=>selector==='.mass-ship-row'?[row,otherRow]:originalQueries(selector);tick();sent.length=0;native.click();assert.ok(sent.findLast(m=>m.type==='START_DOCUMENT_TASK').familyMart);
 console.log('PASS: FamilyMart image mode, packing/picklist counts, order text ignored');
 
