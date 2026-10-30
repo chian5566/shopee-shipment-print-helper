@@ -111,7 +111,7 @@
       const aria=clean(input.getAttribute?.('aria-label'));
       if(input.value===title || aria===title || labelText===title || labelText.startsWith(title+' '))return true;
       const parent=label?.parentElement;
-      return parent?.querySelectorAll?.('input[type="checkbox"]').length===1 && clean(parent.innerText||parent.textContent).startsWith(title);
+      return parent?.querySelectorAll?.('input[type="checkbox"]').length===1 && (clean(parent.innerText||parent.textContent)===title || clean(parent.innerText||parent.textContent).startsWith(title+' '));
     });
     return candidates.find(input=>input.checked) || candidates[0];
   }
@@ -128,9 +128,8 @@
         clean(button.textContent).replace(/\s/g, '').includes('下載所選文件'));
   }
 
-  const THERMAL_HINT = '助手目前僅支援熱感列印，請將寄件單切換為熱感列印。一般列印仍可使用蝦皮原生下載。';
-  function thermalLabelSelected() {
-    return [...document.querySelectorAll('input[type="radio"][value="C2C_SHIPPING_LABEL_THERMAL"]')].some(input => {
+  function formatSelected(value) {
+    return [...document.querySelectorAll(`input[type="radio"][value="${value}"]`)].some(input => {
       const wrapper=input.closest?.('label') || input;
       const visible=!wrapper.getClientRects || wrapper.getClientRects().length>0;
       return visible && input.checked && !input.disabled;
@@ -153,33 +152,40 @@
     return clean(name?.textContent || label.innerText).replace(/\s*[（(]\s*\d+\s*[)）]\s*$/, '');
   }
 
-  const UNSUPPORTED_CARRIER_HINT = '此物流方式尚未支援，請使用蝦皮原生下載。';
+  function downloadErrors() {
+    if (!isDownloadPage()) return [];
+    const errors = [], carrier = selectedCarrier();
+    if (!carrier) errors.push('請先選擇上方的物流方式。');
+    else if (!/^(蝦皮店到店(?:\s*[-－–—]\s*(?:隔日到貨|無包裝隔日到))?|店到家宅配|新竹物流|7-ELEVEN|全家|FamilyMart|萊爾富|黑貓宅急便|嘉里快遞)$/i.test(carrier)) {
+      errors.push('此物流方式尚未支援印單助手。');
+    }
+    if (!selectedOrders().length) errors.push('請至少勾選一筆訂單。');
+    if (documentCheckbox('撿貨單')?.checked) errors.push('請取消勾選「撿貨單」。');
+    const shipping = documentCheckbox('寄件單'), packing = documentCheckbox('裝箱單');
+    if (!shipping?.checked || shipping.disabled) errors.push('請勾選「寄件單」。');
+    else if (carrier && !/^(7-ELEVEN|全家|FamilyMart|萊爾富)$/i.test(carrier) && !formatSelected('C2C_SHIPPING_LABEL_THERMAL')) {
+      errors.push('請將寄件單設為「熱感列印」。');
+    }
+    if (!packing?.checked || packing.disabled) errors.push('請勾選「裝箱單」。');
+    else if (!formatSelected('PACKING_LIST_PDF')) errors.push('請將裝箱單設為「PDF」。');
+    return errors;
+  }
 
   function assistantMode() {
     if (!isDownloadPage()) return {enabled:false,hint:PAGE_HINT};
     const carrierName = selectedCarrier();
-    if (carrierName === '其他寄送方式') return {enabled:false,hint:UNSUPPORTED_CARRIER_HINT};
-    if (!documentCheckbox('寄件單')?.checked || !documentCheckbox('裝箱單')?.checked) {
-      return {enabled:false,hint:'請同時勾選寄件單和裝箱單後才可使用'};
-    }
-    if (!carrierName) return {enabled:false,hint:'尚未讀取到上方選取的物流方式，請重新選擇物流方式。'};
+    if (downloadErrors().length) return {enabled:false,hint:''};
     const experimental = /^(蝦皮店到店\s*[-－–—]\s*無包裝隔日到|萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName);
     const experimentalHint = /^(萊爾富|黑貓宅急便|嘉里快遞)$/.test(carrierName) ? '此物流方式為測試版本，請少量試印，有發生錯誤請透過表單回報' : '';
     if (carrierName === '萊爾富') return {enabled:true,hint:experimentalHint,carrierName,experimental:true,experimentalPdf:true,hilife:true};
     if (/^7-ELEVEN$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,sevenEleven:true};
     if (/^(全家|FamilyMart)$/i.test(carrierName)) return {enabled:true,hint:'',carrierName,familyMart:true};
-    if (!thermalLabelSelected()) return {enabled:false,hint:THERMAL_HINT};
     return {enabled:true,hint:experimentalHint,carrierName,experimental,experimentalPdf:/^(黑貓宅急便|嘉里快遞)$/.test(carrierName)};
   }
 
-  const PICKLIST_HINT = '請取消勾選「撿貨單」，再下載寄件單與裝箱單。';
   const guardedDownloadButtons = new Map();
-  function picklistDownloadBlocked() {
-    return isDownloadPage() && Boolean(documentCheckbox('撿貨單')?.checked);
-  }
-
   function renderDownloadGuard() {
-    const blocked = picklistDownloadBlocked();
+    const errors = downloadErrors(), blocked = errors.length > 0;
     const buttons = blocked ? [...document.querySelectorAll('button, [role="button"]')].filter(button =>
       !button.closest?.('#lh-shipment-panel') && clean(button.textContent).replace(/\s/g,'').includes('下載所選文件') &&
       (!button.getClientRects || button.getClientRects().length > 0)) : [];
@@ -201,17 +207,19 @@
         note.id = 'lh-download-error-' + (++downloadGuardId);
         note.className = 'lh-download-error';
         note.setAttribute('role', 'alert');
-        note.textContent = PICKLIST_HINT;
         state = {note, disabledByGuard:!button.disabled, ariaDisabled:button.getAttribute('aria-disabled'), describedBy:button.getAttribute('aria-describedby')};
         guardedDownloadButtons.set(button, state);
-        document.documentElement.append(note);
+        button.insertAdjacentElement('afterend', note);
         button.setAttribute('aria-describedby', [state.describedBy, note.id].filter(Boolean).join(' '));
       }
-      if (state.disabledByGuard) button.disabled = true;
+      // Vue can enable a formerly native-disabled button after orders change.
+      if (!button.disabled) state.disabledByGuard = true;
+      button.disabled = true;
       button.setAttribute('aria-disabled', 'true');
-      const rect = button.getBoundingClientRect();
-      state.note.style.top = (rect.bottom + 6) + 'px';
-      state.note.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 328)) + 'px';
+      const message = errors.join('\n');
+      if (state.note.textContent !== message) state.note.textContent = message;
+      // Shopee may replace the button wrapper without changing its controls.
+      if (button.nextElementSibling !== state.note) button.insertAdjacentElement('afterend', state.note);
     }
   }
   let downloadGuardId = 0;
@@ -225,7 +233,7 @@
     if (mode.hint===PAGE_HINT) {
       hint.innerHTML=`請前往蝦皮「<a href="${DOWNLOAD_PAGE_URL}" style="color:inherit;text-decoration:underline">批次出貨 → 下載出貨文件</a>」頁面使用出貨助手。`;
     }
-    const visible = !mode.enabled || Boolean(mode.hint);
+    const visible = Boolean(mode.hint);
     hint.hidden=!visible;
     hint.style?.setProperty('display',visible?'block':'none','important');
   }
@@ -235,7 +243,7 @@
     const native=event.target?.closest?.('button, [role="button"]');
     if(!native || !clean(native.textContent).replace(/\s/g,'').includes('下載所選文件'))return;
     // Check again at capture time, including newly mounted buttons before polling.
-    if (picklistDownloadBlocked()) {
+    if (downloadErrors().length) {
       event.preventDefault();event.stopImmediatePropagation();renderDownloadGuard();return;
     }
     if(native.disabled)return;
@@ -248,7 +256,6 @@
     renderMode();renderTasks();
     const mode=assistantMode();
     if (!mode.enabled) {
-      if ([THERMAL_HINT,UNSUPPORTED_CARRIER_HINT].includes(mode.hint) && !panel?.isConnected) makePanel();
       return;
     }
     const orders=selectedOrders();
@@ -257,7 +264,7 @@
       const task={name:mode.carrierName+' 寄件單＋裝箱單',startedAt:Date.now(),orders:[],stage:'讀取已選訂單'};
       tasks.unshift(task);failTask(task,'未讀取到已選訂單，請重新勾選訂單。');return;
     }
-    const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?(documentCheckbox('撿貨單')?.checked?2:1):2;
+    const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?1:2;
     const carrierName=mode.carrierName+' ';
     const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,carrierName:mode.carrierName,experimental:Boolean(mode.experimental),experimentalPdf:Boolean(mode.experimentalPdf),hilife:Boolean(mode.hilife),sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
     activeTask=task;
@@ -557,7 +564,5 @@
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);
   document.addEventListener('change', () => { renderDownloadGuard();window.setTimeout(configureShopeeDefaults, 0); });
-  window.addEventListener('scroll', renderDownloadGuard, true);
-  window.addEventListener('resize', renderDownloadGuard);
   window.setInterval(configureShopeeDefaults, 250);
 })();
