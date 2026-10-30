@@ -18,22 +18,35 @@ function fixture(){
  const visible=()=>nodes.filter(n=>n.className==='lh-guide-bubble'&&n.isConnected&&!n.hidden);
  return {context,all,shipping,packing,thermal,pdf,tick,visible,handlers,setSelected:v=>selected=v,setThermal:v=>thermalShown=v,setPdf:v=>pdfShown=v,setDownload:v=>downloadShown=v,setControls:v=>nativeControls=v,setHidden:v=>hiddenCopy=v};
 }
-test('guide points to missing document checkboxes then formats, reflects manual changes without clicking',()=>{
- const f=fixture();assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單','2. 勾選寄件單','3. 勾選裝箱單','4. 點擊「下載所選文件」']);
- f.setSelected(true);f.shipping.checked=f.packing.checked=true;f.thermal.checked=f.pdf.checked=true;f.tick();
- assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單 ✓','4. 點擊「下載所選文件」','2. 選擇「熱感列印」 ✓','3. 選擇「PDF」 ✓']);
- f.thermal.checked=false;f.pdf.checked=false;f.handlers.change();assert.equal(f.visible().find(x=>x.textContent.includes('熱感')).dataset.done,'false');assert.equal(f.pdf.checked,false);
- f.setSelected(false);f.tick();assert.equal(f.visible()[0].dataset.done,'false');
+test('guide reveals each step only after earlier steps complete and rolls back when unchecked',()=>{
+ const f=fixture();assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單']);
+ f.setSelected(true);f.tick();
+ assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單 ✓','2. 勾選寄件單']);
+ f.shipping.checked=true;f.handlers.change();
+ assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單 ✓','2. 選擇「熱感列印」']);
+ f.thermal.checked=true;f.handlers.change();
+ assert.ok(f.visible().some(x=>x.textContent==='3. 勾選裝箱單'));
+ assert.ok(!f.visible().some(x=>x.textContent.includes('下載所選文件')));
+ f.packing.checked=true;f.handlers.change();
+ assert.ok(f.visible().some(x=>x.textContent==='3. 選擇「PDF」'));
+ assert.ok(!f.visible().some(x=>x.textContent.includes('下載所選文件')));
+ f.pdf.checked=true;f.handlers.change();
+ assert.ok(f.visible().some(x=>x.textContent==='4. 點擊「下載所選文件」'));
+ f.thermal.checked=false;f.handlers.change();
+ assert.equal(f.visible().find(x=>x.textContent.includes('熱感')).dataset.done,'false');
+ assert.ok(!f.visible().some(x=>/PDF|下載所選文件/.test(x.textContent)));
+ assert.equal(f.pdf.checked,true);
+ f.setSelected(false);f.tick();assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單']);
 });
 test('carrier remount skips unavailable formats and ignores hidden duplicate',()=>{
- const f=fixture();f.shipping.checked=f.packing.checked=true;f.setThermal(false);f.tick();
- assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單','2. 勾選寄件單 ✓','4. 點擊「下載所選文件」','3. 選擇「PDF」']);
+ const f=fixture();f.setSelected(true);f.shipping.checked=f.packing.checked=true;f.setThermal(false);f.tick();
+ assert.deepEqual(f.visible().map(x=>x.textContent),['1. 勾選訂單 ✓','2. 勾選寄件單 ✓','3. 選擇「PDF」']);
  f.setThermal(true);f.setHidden(true);f.tick();assert.equal(f.visible().find(x=>x.textContent.includes('熱感')).dataset.done,'false');
  f.setPdf(false);f.tick();assert.ok(!f.visible().some(x=>x.textContent.includes('PDF')));
  f.context.location.pathname='/portal/product/list/live';f.tick();assert.equal(f.visible().length,0);
 });
 test('7-ELEVEN keeps shipping as step two before and after checking without a thermal option',()=>{
- const f=fixture();f.setThermal(false);f.packing.checked=f.pdf.checked=true;f.tick();
+ const f=fixture();f.setSelected(true);f.setThermal(false);f.packing.checked=f.pdf.checked=true;f.tick();
  assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單' && b.dataset.done==='false'));
  f.shipping.checked=true;f.handlers.change();
  assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單 ✓' && b.dataset.done==='true'));
@@ -43,7 +56,7 @@ test('7-ELEVEN keeps shipping as step two before and after checking without a th
  assert.ok(f.visible().some(b=>b.textContent==='2. 勾選寄件單'));
 });
 test('scroll hides offscreen targets and guide never overlaps its own bubbles',()=>{
- const f=fixture();const bubbles=f.visible();
+ const f=fixture();f.setSelected(true);f.shipping.checked=f.packing.checked=f.thermal.checked=f.pdf.checked=true;f.tick();const bubbles=f.visible();
  for(let i=0;i<bubbles.length;i++)for(let j=i+1;j<bubbles.length;j++){
  const a=bubbles[i],b=bubbles[j];assert.ok(Math.abs(parseFloat(a.style.top)-parseFloat(b.style.top))>=38);
  }
@@ -53,7 +66,7 @@ test('scroll hides offscreen targets and guide never overlaps its own bubbles',(
 });
 
 test('bubble avoids adjacent document label while arrow stays aligned to radio',()=>{
- const f=fixture();f.shipping.checked=f.packing.checked=true;
+ const f=fixture();f.setSelected(true);f.shipping.checked=f.packing.checked=f.thermal.checked=true;
  f.setControls([f.packing.closest('label')]);f.tick();
  const bubble=f.visible().find(b=>b.textContent.includes('PDF'));
  assert.ok(bubble);assert.equal(bubble.dataset.below,'true');
@@ -61,7 +74,7 @@ test('bubble avoids adjacent document label while arrow stays aligned to radio',
 });
 
 test('dense 7-ELEVEN document list keeps shipping prompt visible beside checkbox',()=>{
- const f=fixture();f.setThermal(false);
+ const f=fixture();f.setSelected(true);f.setThermal(false);
  const rect=(top,width=150)=>({left:320,right:320+width,top,bottom:top+22,width,height:22});
  const move=(input,top)=>{
   const label=input.closest('label');label.getBoundingClientRect=()=>rect(top);
