@@ -4,7 +4,7 @@
 
 [從 Chrome 商店安裝](https://chromewebstore.google.com/detail/pallcldjfgojcnbcnkmcpibhfpnkkfgf)
 
-目前版本：**v0.11.11**｜[更新紀錄](CHANGELOG.md)
+目前版本：**v0.11.12**｜[更新紀錄](CHANGELOG.md)
 
 ## 使用方式
 
@@ -38,7 +38,7 @@
 <details>
 <summary>手動安裝（進階）</summary>
 
-1. [下載 v0.11.11 安裝檔](https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.11/shopee-shipment-print-helper-v0.11.11.zip) 並解壓縮。
+1. [下載 v0.11.12 安裝檔](https://github.com/chian5566/shopee-shipment-print-helper/releases/download/v0.11.12/shopee-shipment-print-helper-v0.11.12.zip) 並解壓縮。
 2. 開啟 `chrome://extensions/`，啟用「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾並保留它。
 4. 重新整理蝦皮頁面。更新時更換檔案，再重新載入擴充功能。
