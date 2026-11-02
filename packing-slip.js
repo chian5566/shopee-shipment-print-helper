@@ -5,7 +5,7 @@
   const compact = s => String(s || '').normalize('NFKC').replace(/\s+/g, '');
 
   // Use PDF text coordinates to read columns, never infer quantities from product titles.
-  function extractRows(items) {
+  function extractRows(items, {startSequence = 1} = {}) {
     const diagnostic = {parser:'packing-columns-v1',textItemCount:items.length};
     const fail = (message, detail = {}) => {
       const error = new Error(message);
@@ -68,8 +68,9 @@
     }
     Object.assign(diagnostic,{hasIndex,rowCount:starts.length,sequence:hasIndex ? starts.slice(0,100).map(i=>({value:Number(compact(i.text).replace(/[.)]$/,'')),x:i.x,y:i.y})) : [],sequenceTruncated:hasIndex && starts.length>100});
     if (!starts.length) fail('裝箱單未找到商品列，已停止產生');
+    if (startSequence>1 && !hasIndex) fail('裝箱單接續區段缺少商品序號，無法安全重排',{expectedSequence:startSequence});
     const rows = starts.map((start,index) => {
-      if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== index+1) fail('裝箱單商品序號不連續，無法安全重排',{row:index+1,expectedSequence:index+1,actualSequence:Number(compact(start.text).replace(/[.)]$/,''))});
+      if (hasIndex && Number(compact(start.text).replace(/[.)]$/,'')) !== startSequence+index) fail('裝箱單商品序號不連續，無法安全重排',{row:index+1,expectedSequence:startSequence+index,actualSequence:Number(compact(start.text).replace(/[.)]$/,''))});
       const bottom = starts[index+1]?.y ?? (footer ? footer.y+3 : -Infinity);
       const group = body.filter(i=>i.y<=start.y+3 && i.y>bottom+3).flatMap(i=>{
         // PDF.js can combine arbitrary specification text and the adjacent quantity.
@@ -127,7 +128,7 @@
     return text.match(/訂單編號\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{6}[A-Z0-9]{6,20})\b/i)?.[1] || '';
   }
 
-  function extractPackingSections(items) {
+  function extractPackingSections(items, {previousSections = []} = {}) {
     const anchors=[];
     for (const item of items.filter(i=>i.str?.trim())) {
       const y=item.transform[5];
@@ -142,16 +143,24 @@
       try {return [{rows:extractRows(items),buyerNote:extractBuyerNote(items),orderId:''}];}
       catch (error) {error.diagnostics={...error.diagnostics,section:1,sectionsOnPage:1,orderIdPresent:false};throw error;}
     }
-    return anchors.map((anchor,index)=>{
+    const sections=[];
+    for (const [index,anchor] of anchors.entries()) {
       const bottom=anchors[index+1]?.y ?? -Infinity;
       const section=items.filter(i=>i.transform[5]<=anchor.y+3 && i.transform[5]>bottom+3);
       try {
-        return {rows:extractRows(section),buyerNote:extractBuyerNote(section),orderId:anchor.orderId};
+        // Only adjacent sections of the same order may continue, with every
+        // sequence number checked against the accumulated row count.
+        const preceding=[...previousSections,...sections];
+        let startSequence=1;
+        for (let n=preceding.length-1;n>=0 && preceding[n].orderId===anchor.orderId;n--) startSequence+=preceding[n].rows.length;
+        if (startSequence===1 && preceding.some(s=>s.orderId===anchor.orderId)) throw new Error('裝箱單訂單區段重複或順序不明，已停止產生');
+        sections.push({rows:extractRows(section,{startSequence}),buyerNote:extractBuyerNote(section),orderId:anchor.orderId});
       } catch (error) {
         error.diagnostics={...error.diagnostics,section:index+1,sectionsOnPage:anchors.length,sectionTopY:anchor.y,sectionBottomY:Number.isFinite(bottom)?bottom:null,orderIdPresent:true};
         throw error;
       }
-    });
+    }
+    return sections;
   }
 
   function matchPackingToLabels(packing, labelIds) {
@@ -244,7 +253,14 @@
       for (let n=1;n<=doc.numPages;n++) {
         try {
           const items=(await (await doc.getPage(n)).getTextContent()).items;
-          pages.push(...extractPackingSections(items));
+          const sections=extractPackingSections(items,{previousSections:pages});
+          for (const section of sections) {
+            const last=pages.at(-1);
+            if (section.orderId && last?.orderId===section.orderId) {
+              last.rows.push(...section.rows);
+              last.buyerNote=[...new Set([last.buyerNote,section.buyerNote].filter(Boolean))].join('\n');
+            } else pages.push(section);
+          }
         } catch (error) {
           error.diagnostics={...error.diagnostics,page:n,totalPages:doc.numPages,completedPages:n-1,completedSections:pages.length,completedRows:pages.reduce((sum,section)=>sum+section.rows.length,0)};
           throw error;
