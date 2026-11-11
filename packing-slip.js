@@ -26,7 +26,8 @@
     function find(line, aliases) {
       const parts = [...line.items].sort((a,b)=>a.x-b.x || b.y-a.y);
       for (let length=1; length<=8; length++) for (let i=0; i+length<=parts.length; i++) {
-        if (aliases.includes(compact(parts.slice(i,i+length).map(p=>p.text).join('')))) return parts[i].x;
+        const matched=parts.slice(i,i+length);
+        if (aliases.includes(compact(matched.map(p=>p.text).join('')))) return {x:parts[i].x,items:matched};
       }
       return null;
     }
@@ -35,12 +36,15 @@
       // Headers may be split over two baselines. Search a small vertical band,
       // retaining each complete source fragment's coordinate for column boundaries.
       const band = {items:text.filter(i=>Math.abs(i.y-line.y)<=Math.max(18,line.items[0].height*1.5))};
-      const c = Object.fromEntries(Object.entries(names).map(([key,aliases])=>[key,find(band,aliases)]));
+      const matches = Object.fromEntries(Object.entries(names).map(([key,aliases])=>[key,find(band,aliases)]));
+      const c = Object.fromEntries(Object.entries(matches).map(([key,match])=>[key,match?.x ?? null]));
       const matchedColumns=Object.values(c).filter(value=>value!==null).length;
       if (!diagnostic.headerCandidate || matchedColumns>diagnostic.headerCandidate.matchedColumns) diagnostic.headerCandidate={columns:c,baselineY:line.y,matchedColumns};
       if (Object.values(c).filter(value=>value!==null).length>=2 && (c.index!==null || c.qty!==null)) {
         columns=c;
-        const headerItems=band.items.filter(i=>Object.values(names).flat().some(alias=>alias.includes(compact(i.text))));
+        // Only fragments forming matched header labels define the table boundary.
+        // A nearby product fragment such as 數 must not match part of 數量.
+        const headerItems=Object.values(matches).filter(Boolean).flatMap(match=>match.items);
         header={y:Math.min(...headerItems.map(i=>i.y))};break;
       }
     }
