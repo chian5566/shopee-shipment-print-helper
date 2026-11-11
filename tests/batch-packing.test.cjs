@@ -15,5 +15,5 @@ assert.throws(()=>slip.matchPackingToLabels(packing,ids.slice(1)),/訂單數不�
 assert.throws(()=>slip.matchPackingToLabels(packing,[ids[0],ids[0],ids[2],ids[3]]),/重複/);
 assert.throws(()=>slip.matchPackingToLabels(packing,['',...ids.slice(1)]),/無法唯一/);
 assert.throws(()=>slip.matchPackingToLabels([packing[0],packing[0]],[packing[0].orderId,packing[0].orderId]),/無法唯一/);
-assert.deepEqual(slip.matchPackingToLabels([packing[0]],['']),[packing[0]]);
+assert.throws(()=>slip.matchPackingToLabels([packing[0]],['']),/無法唯一/);
 console.log('PASS: real four-order/two-page packing, single order with missing parent SKU, 8 items, empty notes, reordered matching, missing data/ambiguous matching rejection');
