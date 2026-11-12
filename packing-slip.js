@@ -4,51 +4,90 @@
   const PRINT_MARGIN = 5 * 72 / 25.4;
   const compact = s => String(s || '').normalize('NFKC').replace(/\s+/g, '');
 
-  // Use PDF text coordinates to read columns, never infer quantities from product titles.
+  const HEADER_NAMES = {sku:['主商品貨號','商品貨號','貨號'], name:['商品名稱'], variantSku:['商品選項貨號'], spec:['商品規格名稱','商品規格','規格名稱','商品選項','選項','規格'], qty:['商品數量','購買數量','數量'], total:['總計','小計','金額'], index:['#','序號']};
+  function tableText(items) {
+    const text=items.filter(i=>i.str?.trim()).map(i=>({text:i.str.trim(),x:i.transform[4],y:i.transform[5],width:i.width||0,height:Math.abs(i.height||i.transform[3]||10),fontName:i.fontName}));
+    if(text.some(i=>![i.x,i.y,i.width,i.height].every(Number.isFinite)||i.width<0||i.height<=0))throw new Error('文件文字座標無效，已停止產生');
+    return text;
+  }
+  function textLines(text) {
+    const lines=[];
+    for(const item of [...text].sort((a,b)=>b.y-a.y||a.x-b.x)) {
+      let line=lines.find(l=>Math.abs(l.y-item.y)<3);
+      if(!line){line={y:item.y,items:[]};lines.push(line);}
+      line.items.push(item);
+    }
+    return lines;
+  }
+  const lineText=line=>[...line.items].sort((a,b)=>a.x-b.x).map(i=>i.text).join('').trim();
+  function headerAt(lines,index) {
+    const line=lines[index],parts=[...line.items].sort((a,b)=>a.x-b.x);
+    const find=(parts,aliases,required=null)=>{
+      for(let length=1;length<=8;length++)for(let n=0;n+length<=parts.length;n++) {
+        const matched=parts.slice(n,n+length);
+        const adjacent=matched.every((part,k)=>!k || (Math.abs(part.y-matched[k-1].y)<3
+          ? part.x-(matched[k-1].x+(matched[k-1].width||matched[k-1].text.length*matched[k-1].height))<=Math.max(3,part.height)
+          : Math.abs(part.x-matched[k-1].x)<3));
+        if(adjacent && (!required||matched.includes(required)) && aliases.includes(compact(matched.map(i=>i.text).join(''))))return {x:matched[0].x,items:matched};
+      }
+      return null;
+    };
+    // Match complete labels on one baseline first. Only a header's own
+    // unfinished fragment can extend vertically into a second header line.
+    const matches=Object.fromEntries(Object.entries(HEADER_NAMES).map(([key,names])=>[key,find(parts,names)]));
+    const occupied=new Set(Object.values(matches).filter(Boolean).flatMap(m=>m.items));
+    for(const [key,names] of Object.entries(HEADER_NAMES))if(!matches[key]) {
+      for(const first of parts.filter(i=>!occupied.has(i))) {
+        const below=lines.slice(index+1).filter(l=>line.y-l.y<=Math.max(18,first.height*1.5)).flatMap(l=>l.items).filter(i=>Math.abs(i.x-first.x)<3);
+        const match=find([first,...below],names,first);
+        if(match && match.items.includes(first)) {matches[key]=match;break;}
+      }
+    }
+    const columns=Object.fromEntries(Object.entries(matches).map(([k,m])=>[k,m?.x??null]));
+    const count=Object.values(matches).filter(Boolean).length;
+    if(count<2 || (columns.index===null && columns.qty===null) || !['sku','name','variantSku','spec'].some(k=>columns[k]!==null))return null;
+    const ordered=['index','sku','name','variantSku','spec','qty','total'].map(k=>columns[k]).filter(x=>x!==null);
+    if(ordered.some((x,i)=>i && x<=ordered[i-1]+3))throw new Error('裝箱單表頭位置重疊或順序不明，已停止產生');
+    const used=Object.values(matches).filter(Boolean).flatMap(m=>m.items);
+    if(new Set(used).size!==used.length)throw new Error('裝箱單表頭文字重複配對，已停止產生');
+    return {columns,y:Math.min(...used.map(i=>i.y)),top:line.y,matchedColumns:count};
+  }
+  function tableLayout(items) {
+    const text=tableText(items),lines=textLines(text);
+    for(let n=0;n<lines.length;n++) {
+      const header=headerAt(lines,n);
+      if(header)return {text,lines,header,columns:header.columns};
+    }
+    return {text,lines,header:null,columns:null};
+  }
+  function tableFooter(layout) {
+    const {lines,header,columns}=layout;
+    if(!header)return null;
+    const left=Math.min(...Object.values(columns).filter(x=>x!==null));
+    const next=Object.values(columns).filter(x=>x!==null && x>left).sort((a,b)=>a-b)[0]??Infinity;
+    for(const line of lines.filter(l=>l.y<header.y-4)) {
+      const first=[...line.items].sort((a,b)=>a.x-b.x)[0];
+      if(first.x>Math.min(left+12,next-3) || !/^(?:買家|賣家|訂單)備[註注](?:[:：]|$)/u.test(lineText(line)))continue;
+      // A marker in a populated product row is product content, never a footer.
+      if(columns.index===null && first.x>=left-3 && columns.qty!==null && line.items.some(i=>i.x>=columns.qty-3 && (columns.total===null||i.x<columns.total-3)))continue;
+      if(columns.index===null && first.x>=left-3)throw new Error('裝箱單備註與商品欄位邊界不明，已停止產生');
+      return line;
+    }
+    return null;
+  }
+
+  // Read only inside established table columns; never infer quantity from text.
   function extractRows(items, {startSequence = 1} = {}) {
-    const diagnostic = {parser:'packing-columns-v1',textItemCount:items.length};
+    const diagnostic = {parser:'packing-columns-v2',textItemCount:items.length};
     const fail = (message, detail = {}) => {
       const error = new Error(message);
       error.diagnostics = {...diagnostic,...detail};
       throw error;
     };
-    const text = items.filter(i => i.str?.trim()).map(i => ({
-      text: i.str.trim(), x: i.transform[4], y: i.transform[5], width:i.width || 0,
-      height: Math.abs(i.height || i.transform[3] || 10), fontName:i.fontName
-    }));
-    const lines = [];
-    for (const item of [...text].sort((a,b) => b.y-a.y || a.x-b.x)) {
-      let line = lines.find(l => Math.abs(l.y-item.y) < 3);
-      if (!line) { line = {y:item.y, items:[]}; lines.push(line); }
-      line.items.push(item);
-    }
-    const names = {sku:['主商品貨號','商品貨號','貨號'], name:['商品名稱'], variantSku:['商品選項貨號'], spec:['商品規格名稱','商品規格','規格名稱','商品選項','選項','規格'], qty:['商品數量','購買數量','數量'], total:['總計','小計','金額'], index:['#','序號']};
-    function find(line, aliases) {
-      const parts = [...line.items].sort((a,b)=>a.x-b.x || b.y-a.y);
-      for (let length=1; length<=8; length++) for (let i=0; i+length<=parts.length; i++) {
-        if (aliases.includes(compact(parts.slice(i,i+length).map(p=>p.text).join('')))) return parts[i].x;
-      }
-      return null;
-    }
-    let columns, header;
-    for (const line of lines) {
-      // Headers may be split over two baselines. Search a small vertical band,
-      // retaining each complete source fragment's coordinate for column boundaries.
-      const band = {items:text.filter(i=>Math.abs(i.y-line.y)<=Math.max(18,line.items[0].height*1.5))};
-      const c = Object.fromEntries(Object.entries(names).map(([key,aliases])=>[key,find(band,aliases)]));
-      const matchedColumns=Object.values(c).filter(value=>value!==null).length;
-      if (!diagnostic.headerCandidate || matchedColumns>diagnostic.headerCandidate.matchedColumns) diagnostic.headerCandidate={columns:c,baselineY:line.y,matchedColumns};
-      if (Object.values(c).filter(value=>value!==null).length>=2 && (c.index!==null || c.qty!==null)) {
-        columns=c;
-        const headerItems=band.items.filter(i=>Object.values(names).flat().some(alias=>alias.includes(compact(i.text))));
-        header={y:Math.min(...headerItems.map(i=>i.y))};break;
-      }
-    }
-    if (!columns) {
-      fail('無法辨識裝箱單欄位，請提供原始裝箱單 PDF 以校正');
-    }
-    Object.assign(diagnostic,{columns,headerY:header.y});
-    const footer = lines.filter(l => l.y < header.y && /買家備[註注]|賣家備[註注]|訂單備[註注]/.test(compact(l.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join('')))).sort((a,b)=>b.y-a.y)[0];
+    const layout=tableLayout(items),{text,lines,header,columns}=layout;
+    if(!header)fail('無法辨識裝箱單欄位，請提供原始裝箱單 PDF 以校正');
+    Object.assign(diagnostic,{headerCandidate:{columns,baselineY:header.top,matchedColumns:header.matchedColumns},columns,headerY:header.y});
+    const footer=tableFooter(layout);
     const body = text.filter(i=>i.y<header.y-4 && (!footer || i.y>footer.y+3));
     const positions=Object.values(columns).filter(value=>value!==null).sort((a,b)=>a-b);
     const rightOf=left=>positions.find(value=>value>left) ?? Infinity;
@@ -105,59 +144,84 @@
   }
 
   function extractBuyerNote(items) {
-    const lines=[];
-    for (const item of items.filter(i=>i.str?.trim()).sort((a,b)=>b.transform[5]-a.transform[5] || a.transform[4]-b.transform[4])) {
-      let line=lines.find(l=>Math.abs(l.y-item.transform[5])<3);
-      if (!line) {line={y:item.transform[5],items:[]};lines.push(line);}
-      line.items.push(item);
-    }
-    const joined=line=>line.items.sort((a,b)=>a.transform[4]-b.transform[4]).map(i=>i.str).join('').trim();
-    const start=lines.findIndex(l=>/買家備[註注]\s*[:：]?/.test(joined(l)));
-    if (start<0) return '';
-    const note=[joined(lines[start]).replace(/^.*?買家備[註注]\s*[:：]?\s*/,'')];
-    for (const line of lines.slice(start+1)) {
-      const value=joined(line);
-      if (/賣家備[註注]|訂單編號|^商品列表$|^第?\s*\d+\s*[\/／]\s*\d+\s*頁?$/.test(value)) break;
-      note.push(value);
+    const layout=tableLayout(items);
+    const footer=layout.header?tableFooter(layout):layout.lines.find(l=>/^買家備[註注](?:[:：]|$)/u.test(lineText(l)));
+    if(!footer || !/^買家備[註注]/u.test(lineText(footer)))return '';
+    const note=[lineText(footer).replace(/^買家備[註注]\s*[:：]?\s*/u,'')];
+    const left=Math.min(...footer.items.map(i=>i.x));
+    for(const line of layout.lines.filter(l=>l.y<footer.y-3)) {
+      const first=[...line.items].sort((a,b)=>a.x-b.x)[0];
+      // Only a separate, aligned seller-note label ends the note. Keywords and
+      // order-like strings inside the buyer's note remain opaque user text.
+      if(Math.abs(first.x-left)<3 && /^(?:賣家|訂單)備[註注][:：]?$/u.test(first.text.normalize('NFKC')))break;
+      note.push(lineText(line));
     }
     return note.filter(Boolean).join('\n').trim();
   }
 
+  function metadataOrderId(line) {
+    const match=lineText(line).normalize('NFKC').match(/^(?:蝦皮)?訂單編號\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{6}[A-Z0-9]{6,20})(?:\s+package\s+\d+)?\s*$/i);
+    return match?.[1]||'';
+  }
   function extractOrderId(items) {
-    const text=items.map(i=>i.str||'').join(' ').normalize('NFKC');
-    return text.match(/訂單編號\s*(?:\([^)]*\))?\s*[:：]?\s*(\d{6}[A-Z0-9]{6,20})\b/i)?.[1] || '';
+    const layout=tableLayout(items);
+    const ids=[...new Set(layout.lines.filter(l=>!layout.header||l.y>layout.header.top+3).map(metadataOrderId).filter(Boolean))];
+    if(ids.length>1)throw new Error('文件包含多個訂單編號，無法唯一配對');
+    return ids[0]||'';
   }
 
   function extractPackingSections(items, {previousSections = []} = {}) {
-    const anchors=[];
-    for (const item of items.filter(i=>i.str?.trim())) {
-      const y=item.transform[5];
-      const line=items.filter(i=>Math.abs(i.transform[5]-y)<3).sort((a,b)=>a.transform[4]-b.transform[4]);
-      const orderId=extractOrderId(line);
-      if (orderId && !anchors.some(a=>Math.abs(a.y-y)<3)) anchors.push({y,orderId});
+    const layout=tableLayout(items),headers=layout.header?[layout.header]:[];
+    // Once inside a table, product and note lines are opaque. A later table
+    // must follow an explicit metadata line, never just look like headers.
+    if(layout.header)for(const metadata of layout.lines.filter(l=>l.y<layout.header.y && metadataOrderId(l))) {
+      for(let n=0;n<layout.lines.length;n++) {
+        const line=layout.lines[n];
+        if(line.y>=metadata.y-3 || metadata.y-line.y>64)continue;
+        const header=headerAt(layout.lines,n);
+        if(header) {
+          if(!headers.some(h=>Math.abs(h.y-header.y)<3))headers.push(header);
+          break;
+        }
+      }
     }
-    anchors.sort((a,b)=>b.y-a.y);
-    // Keep the no-ID path for column diagnostics; document identification still
-    // requires a nonempty, unique order ID before pairing with shipping labels.
-    if (!anchors.length) {
-      try {return [{rows:extractRows(items),buyerNote:extractBuyerNote(items),orderId:''}];}
-      catch (error) {error.diagnostics={...error.diagnostics,section:1,sectionsOnPage:1,orderIdPresent:false};throw error;}
+    headers.sort((a,b)=>b.top-a.top);
+    if(!headers.length) {
+      try {return [{rows:extractRows(items),buyerNote:'',orderId:''}];}
+      catch(error){error.diagnostics={...error.diagnostics,section:1,sectionsOnPage:1,orderIdPresent:false};throw error;}
+    }
+    const regions=[];
+    for(const [index,header] of headers.entries()) {
+      const previous=headers[index-1];
+      let ceiling=Infinity;
+      if(previous) {
+        const upperItems=items.filter(i=>i.transform[5]<=previous.top+3 && i.transform[5]>header.top+3);
+        const footer=tableFooter(tableLayout(upperItems));
+        if(!footer)throw new Error('裝箱單區段邊界不明，已停止產生');
+        ceiling=footer.y;
+      }
+      const titleBefore=layout.lines.find(l=>l.y>header.top+3 && l.y<ceiling-3 && l.y-header.top<80 && lineText(l)==='商品列表');
+      const candidates=layout.lines.filter(l=>l.y>header.top+3 && l.y<ceiling-3 && (!index || (titleBefore?l.y<titleBefore.y+3:l.y-header.top<=64)))
+        .map(line=>({line,orderId:metadataOrderId(line)})).filter(a=>a.orderId);
+      if(candidates.length>1)throw new Error('裝箱單訂單編號不唯一，已停止產生');
+      if(index && !candidates.length)throw new Error('裝箱單接續區段缺少訂單編號，已停止產生');
+      let top=candidates[0]?.line.y??header.top;
+      const title=layout.lines.find(l=>l.y>top && l.y<ceiling-3 && l.y-top<20 && lineText(l)==='商品列表' && l.items[0].x<=Math.min(...Object.values(header.columns).filter(x=>x!==null))+12);
+      if(title)top=title.y;
+      regions.push({header,orderId:candidates[0]?.orderId||'',top});
     }
     const sections=[];
-    for (const [index,anchor] of anchors.entries()) {
-      const bottom=anchors[index+1]?.y ?? -Infinity;
-      const section=items.filter(i=>i.transform[5]<=anchor.y+3 && i.transform[5]>bottom+3);
+    for(const [index,region] of regions.entries()) {
+      const bottom=regions[index+1]?.top??-Infinity;
+      const section=items.filter(i=>i.transform[5]<=region.top+3 && i.transform[5]>bottom+3);
       try {
-        // Only adjacent sections of the same order may continue, with every
-        // sequence number checked against the accumulated row count.
         const preceding=[...previousSections,...sections];
         let startSequence=1;
-        for (let n=preceding.length-1;n>=0 && preceding[n].orderId===anchor.orderId;n--) startSequence+=preceding[n].rows.length;
-        if (startSequence===1 && preceding.some(s=>s.orderId===anchor.orderId)) throw new Error('裝箱單訂單區段重複或順序不明，已停止產生');
-        sections.push({rows:extractRows(section,{startSequence}),buyerNote:extractBuyerNote(section),orderId:anchor.orderId});
-      } catch (error) {
-        error.diagnostics={...error.diagnostics,section:index+1,sectionsOnPage:anchors.length,sectionTopY:anchor.y,sectionBottomY:Number.isFinite(bottom)?bottom:null,orderIdPresent:true};
-        throw error;
+        for(let n=preceding.length-1;n>=0 && preceding[n].orderId===region.orderId;n--)startSequence+=preceding[n].rows.length;
+        if(startSequence===1 && region.orderId && preceding.some(s=>s.orderId===region.orderId))throw new Error('裝箱單訂單區段重複或順序不明，已停止產生');
+        sections.push({rows:extractRows(section,{startSequence}),buyerNote:extractBuyerNote(section),orderId:region.orderId});
+      } catch(error) {
+        error.diagnostics={...error.diagnostics,section:index+1,sectionsOnPage:regions.length,sectionTopY:region.top,sectionBottomY:Number.isFinite(bottom)?bottom:null,orderIdPresent:!!region.orderId};throw error;
       }
     }
     return sections;
@@ -166,7 +230,6 @@
   function matchPackingToLabels(packing, labelIds) {
     if (packing.length!==labelIds.length) throw new Error('寄件單與裝箱單訂單數不同，無法安全逐筆配對，請核對原始文件');
     const ordered=labelIds.map((id,index)=>{
-      if (!id && labelIds.length===1) id=packing[0].orderId;
       const matches=packing.filter(p=>p.orderId && p.orderId===id);
       if (matches.length!==1) throw new Error(`第 ${index+1} 張寄件單無法唯一對應訂單編號，已停止產生`);
       return matches[0];
@@ -181,10 +244,16 @@
       const ids=[];
       for(let n=1;n<=doc.numPages;n++) {
         const items=(await(await doc.getPage(n)).getTextContent()).items;
-        const text=compact(items.map(i=>i.str||'').join(''));
-        const found=knownIds.filter(id=>text.includes(id));
-        const byTracking=orders.filter(order=>(order.summary||'').split(/\s+/).some(token=>/^TW[A-Z0-9]{8,}$/i.test(token)&&text.includes(token)));
-        ids.push(found.length===1?found[0]:extractOrderId(items)||(byTracking.length===1?byTracking[0].orderId:''));
+        const text=items.map(i=>i.str||'').join(' ').normalize('NFKC').toUpperCase();
+        const token=value=>new RegExp('(?:^|[^A-Z0-9])'+value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=$|[^A-Z0-9])').test(text);
+        const evidence=new Set(knownIds.filter(token));
+        const explicit=extractOrderId(items);
+        if(explicit)evidence.add(explicit);
+        for(const order of orders)if((order.summary||'').split(/\s+/).some(t=>/^TW[A-Z0-9]{8,}$/i.test(t)&&token(t.toUpperCase())))evidence.add(order.orderId);
+        if(evidence.size>1)throw new Error('寄件單訂單編號與物流證據不一致，已停止產生');
+        const id=[...evidence][0]||'';
+        if(id && !knownIds.includes(id))throw new Error('寄件單包含本次範圍外訂單，已停止產生');
+        ids.push(id);
       }
       return ids;
     } finally {await doc.loadingTask.destroy();}
@@ -194,8 +263,9 @@
   // tracking-number cell. Never infer pairing from page position or row summaries.
   function experimentalOrderId(items, knownIds, orders) {
     const text = items.map(item=>item.str || '').join(' ').toUpperCase();
-    const compactText = text.replace(/\s/g, '');
-    const evidence = new Set(knownIds.filter(id=>compactText.includes(id.toUpperCase())));
+    const evidence = new Set(knownIds.filter(id=>new RegExp('(?:^|[^A-Z0-9])'+id+'(?=$|[^A-Z0-9])').test(text)));
+    const explicit=extractOrderId(items);
+    if(explicit)evidence.add(explicit);
     for (const order of orders) {
       const tracking = (order.trackingNumber || '').replace(/\s/g, '').toUpperCase();
       if (!/^[A-Z0-9-]{8,32}$/.test(tracking)) continue;
