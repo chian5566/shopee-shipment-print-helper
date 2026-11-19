@@ -23,7 +23,7 @@
 .lh-order:last-child { border-bottom:0; }
 .lh-order:nth-child(even) { background:#f8fafc; }
 .lh-order-header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:10px; margin-bottom:10px; }
-.lh-order-number { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#15803d; color:#fff; font-size:12px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+.lh-order-number { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#1f2937; color:#fff; font-size:12px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
 .lh-order-id span { display:block; color:#667085; font-size:10px; margin-bottom:4px; }
 .lh-order-id strong { display:block; color:#172033; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:14px; font-weight:600; line-height:1.4; overflow-wrap:anywhere; }
 .lh-order-meta { display:grid; grid-template-columns:36px minmax(0,1fr); gap:6px 10px; margin:0; line-height:1.5; }
