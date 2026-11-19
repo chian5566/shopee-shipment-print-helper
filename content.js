@@ -283,6 +283,7 @@
     const startedAt=Date.now(),expectedFiles=(mode.sevenEleven || mode.familyMart)?1:2;
     const carrierName=mode.carrierName+' ';
     const task={id:startedAt+'-'+Math.random(),name:carrierName+'寄件單＋裝箱單 × '+orders.length+' 筆',detail:'正在準備文件…',stage:'等待蝦皮文件',startedAt,orders,expectedFiles,carrierName:mode.carrierName,experimental:Boolean(mode.experimental),experimentalPdf:Boolean(mode.experimentalPdf),hilife:Boolean(mode.hilife),sevenEleven:Boolean(mode.sevenEleven),familyMart:Boolean(mode.familyMart),progress:10};
+    task.previousDownloadErrors=new Set(globalThis.LHShopeeDownloadError?.visibleTitles(document));
     activeTask=task;
     document.documentElement.setAttribute('data-lh-background-task',task.id);
     if(task.familyMart)document.documentElement.setAttribute('data-lh-family-background-task',task.id);
@@ -290,6 +291,13 @@
     chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,familyMart:task.familyMart,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
     task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:(task.experimental?'此試作物流尚未取得完整 PDF，請使用蝦皮原始文件；外部網頁寄件單尚未支援。':'尚未取得完整文件，請重新下載。'));},90000);
+  }
+
+  function failShopeeDownload(task) {
+    if (!task || task.cancelled || task.failed || task.merging || task.combinedUrl) return false;
+    task.stage='等待蝦皮文件';
+    failTask(task,globalThis.LHShopeeDownloadError.message);
+    return true;
   }
 
   function errorInfo(error) {
@@ -547,6 +555,10 @@
       else renderMode();
       sendResponse?.({ok:true,downloadPage:isDownloadPage()}); return;
     }
+    if (message.type === 'SHOPEE_DOWNLOAD_FAILED') {
+      sendResponse?.({ok:activeTask?.id===message.taskId && failShopeeDownload(activeTask)});
+      return;
+    }
     if (message.type === 'PREVIEW_PDF') {
       const task = activeTask; if (!task || task.cancelled || task.failed || task.combinedUrl || message.taskId !== task.id) return;
       try {
@@ -580,5 +592,13 @@
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);
   document.addEventListener('change', () => { renderDownloadGuard();window.setTimeout(configureShopeeDefaults, 0); });
-  window.setInterval(configureShopeeDefaults, 250);
+  window.setInterval(() => {
+    const task=activeTask;
+    if (task && !task.merging && !task.combinedUrl) {
+      const visibleErrors=globalThis.LHShopeeDownloadError?.visibleTitles(document) || [];
+      if (visibleErrors.some(node=>!task.previousDownloadErrors.has(node))) failShopeeDownload(task);
+      else task.previousDownloadErrors=new Set(visibleErrors);
+    }
+    configureShopeeDefaults();
+  }, 250);
 })();

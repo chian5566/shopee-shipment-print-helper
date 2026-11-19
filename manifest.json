@@ -38,6 +38,7 @@
         "https://seller.shopee.tw/awbprint*"
       ],
       "js": [
+        "shopee-download-error.js",
         "preview-reader.js"
       ],
       "run_at": "document_idle"
@@ -65,6 +66,7 @@
         "packing-slip.js",
         "seven-eleven.js",
         "familymart.js",
+        "shopee-download-error.js",
         "content.js",
         "print-guide.js"
       ],
