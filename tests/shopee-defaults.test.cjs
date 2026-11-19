@@ -39,10 +39,10 @@ const oldId=sent.find(m=>m.type==='START_DOCUMENT_TASK').taskId;
  // Invalid formats block native download and do not duplicate errors in the panel.
 thermal.checked=false;tick();
 assert.equal(panel.querySelector('.lh-mode-hint').hidden,true);
-const nativeBefore=nativeRuns,waitsBefore=timeouts.filter(t=>t.delay===90000).length;
+const nativeBefore=nativeRuns,waitsBefore=timeouts.filter(t=>t.delay===180000).length;
 sent.length=0;native.click();assert.equal(nativeRuns,nativeBefore);
 assert.equal(sent.length,0);
-assert.equal(timeouts.filter(t=>t.delay===90000).length,waitsBefore);
+assert.equal(timeouts.filter(t=>t.delay===180000).length,waitsBefore);
 thermalDuplicates.push({checked:true,closest:()=>({getClientRects:()=>[]})});
 sent.length=0;native.click();assert.equal(sent.length,0);thermalDuplicates.length=0;
 panel.remove();sent.length=0;native.click();assert.equal(panel.isConnected,false);
@@ -80,7 +80,7 @@ assert.match(panel.querySelector('.lh-tasks').innerHTML,/尚無列印任務/);
 assert.equal(panel.querySelector('.lh-clear-tasks').disabled,true);
 assert.equal(sent.at(-1).type,'STOP_DOCUMENT_TASK');
 runtimeListener({type:'PREVIEW_PDF',taskId,url:'late',base64:btoa('%PDF-1.7')},null,()=>{throw Error('cleared task must not accept PDF');});
-timeouts.filter(t=>t.delay===90000).forEach(t=>t.fn());
+timeouts.filter(t=>t.delay===180000).forEach(t=>t.fn());
 assert.match(panel.querySelector('.lh-tasks').innerHTML,/尚無列印任務/);
 native.click();assert.equal(panel.querySelector('.lh-clear-tasks').disabled,false);
 windowEvents.pagehide();assert.match(panel.querySelector('.lh-tasks').innerHTML,/尚無列印任務/);
@@ -151,12 +151,12 @@ carrierName='其他寄送方式';row.innerText='buyer 新竹物流 全家 7-ELEV
 for (const thermalChoice of [false,true]) for (const documents of [false,true]) {
  thermal=control('radio','C2C_SHIPPING_LABEL_THERMAL',thermalChoice);
  packingPdf.checked=false;label.checked=packing.checked=documents;
- const clicksBefore=thermal.clicks,nativeBefore=nativeRuns,waitsBefore=timeouts.filter(t=>t.delay===90000).length;
+ const clicksBefore=thermal.clicks,nativeBefore=nativeRuns,waitsBefore=timeouts.filter(t=>t.delay===180000).length;
  tick();assert.equal(thermal.checked,thermalChoice);assert.equal(thermal.clicks,clicksBefore);assert.equal(packingPdf.checked,false);
  assert.equal(panel.querySelector('.lh-mode-hint').hidden,true);
  sent.length=0;native.click();assert.equal(nativeRuns,nativeBefore);
  assert.ok(!sent.some(m=>m.type==='START_DOCUMENT_TASK'));
- assert.equal(timeouts.filter(t=>t.delay===90000).length,waitsBefore);
+ assert.equal(timeouts.filter(t=>t.delay===180000).length,waitsBefore);
 }
 panel.remove();sent.length=0;native.click();assert.equal(panel.isConnected,false);assert.equal(sent.length,0);
 carrierName='蝦皮店到店';label.checked=packing.checked=true;packingPdf.checked=true;tick();sent.length=0;native.click();

@@ -290,7 +290,7 @@
     if(task.sevenEleven)document.documentElement.setAttribute('data-lh-seven-background-task',task.id);
     chrome.runtime.sendMessage({type:'START_DOCUMENT_TASK',taskId:task.id,expectedFiles:task.expectedFiles,sevenEleven:task.sevenEleven,familyMart:task.familyMart,orderIds:orders.map(order=>order.orderId)});
     tasks.unshift(task);renderTasks();
-    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:(task.experimental?'此試作物流尚未取得完整 PDF，請使用蝦皮原始文件；外部網頁寄件單尚未支援。':'尚未取得完整文件，請重新下載。'));},90000);
+    task.waitTimer=window.setTimeout(()=>{if(!task.cancelled && ((task.previewFiles?.length||0)<task.expectedFiles || ((task.sevenEleven || task.familyMart) && !task.sevenLabels)) && !task.combinedUrl && !task.failed)failTask(task,(task.sevenEleven || task.familyMart)?`尚未取得完整文件，請確認 ${task.familyMart?'全家寄件單':'7-ELEVEN 服務單'}視窗已開啟、圖片載入完成且擴充功能已允許該網站。`:(task.experimental?'此試作物流尚未取得完整 PDF，請使用蝦皮原始文件；外部網頁寄件單尚未支援。':'尚未取得完整文件，請重新下載。'));},180000);
   }
 
   function failShopeeDownload(task) {
@@ -398,6 +398,8 @@
       const started=new Date(task.startedAt);
       const time=started.toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hourCycle:'h23'});
       const progress=task.cancelled || task.failed ? '' : `<div class="lh-progress"><i style="width:${task.progress || 0}%"></i></div>`;
+      const spinner = !task.cancelled && !task.failed && !task.combinedUrl
+        ? '<i class="lh-task-spinner" aria-hidden="true"></i>' : '';
       const readyAge=task.readyAt ? Date.now()-task.readyAt : 2400;
       const flashing=task.combinedUrl && readyAge>=0 && readyAge<2400 && !task.lastPreviewAt;
       const stateClass=task.combinedUrl ? (task.lastPreviewAt ? ' lh-task-viewed' : ' lh-task-unviewed') : '';
@@ -405,7 +407,7 @@
       const previewTime=task.lastPreviewAt ? new Date(task.lastPreviewAt) : null;
       const previewStatus=task.combinedUrl ? `<span class="lh-preview-state">${previewTime ? '已預覽' : '尚未預覽'}</span>${previewTime ? `<time class="lh-task-time" datetime="${previewTime.toISOString()}">上次預覽：${escapeHtml(previewTime.toLocaleString('sv-SE',{timeZone:'Asia/Taipei',hourCycle:'h23'}))}</time>` : ''}` : '';
       const errorActions=task.failed && !task.cancelled ? `<p class="lh-error-report">發生錯誤？請<a href="${REPORT_URL}" target="_blank" rel="noopener noreferrer">回報到 Google 表單</a>，協助完善這個功能。</p><button type="button" class="lh-error-details" data-task="${index}">查看錯誤詳情</button>` : '';
-      return `<div class="lh-task${stateClass}${flashing ? ' lh-ready-flash' : ''}"${animation}><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><span>${escapeHtml(task.detail)}</span>${errorActions}${progress}${previewStatus}${task.previewError ? `<span class="lh-preview-error">${escapeHtml(task.previewError)}</span>` : ''}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">'+(previewTime ? '再次預覽文件' : '預覽文件')+'</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
+      return `<div class="lh-task${stateClass}${flashing ? ' lh-ready-flash' : ''}"${animation}><b>${escapeHtml(task.name)}</b><time class="lh-task-time" datetime="${started.toISOString()}">開始：${escapeHtml(time)}</time><div class="lh-task-status">${spinner}<span>${escapeHtml(task.detail)}</span></div>${errorActions}${progress}${previewStatus}${task.previewError ? `<span class="lh-preview-error">${escapeHtml(task.previewError)}</span>` : ''}${task.combinedUrl ? '<button class="lh-print" data-task="' + index + '">'+(previewTime ? '再次預覽文件' : '預覽文件')+'</button>' : ''}${task.combinedUrl && task.additionalUrls?.length ? task.additionalUrls.map((url,n)=>`<p><a href="${url}" download="其他文件${n+1}.pdf">下載其他文件</a></p>`).join('') : ''}${task.failed && task.sourceUrls ? task.sourceUrls.map((url,n)=>`<p><a href="${url}" download="蝦皮原始文件${n+1}.pdf">下載原始文件 ${n+1}</a></p>`).join('') : ''}</div>`;
     }).join('') : '<div class="lh-muted">尚無列印任務</div>';
     slot.querySelectorAll('.lh-print').forEach(button=>button.onclick=()=>previewTask(tasks[Number(button.dataset.task)]));
     slot.querySelectorAll('.lh-error-details').forEach(button=>{const task=tasks[Number(button.dataset.task)];button.onclick=()=>showErrorDetails(task,button);});
@@ -592,6 +594,7 @@
   document.addEventListener('click',handleNativeDownload,true);
   window.addEventListener('pagehide',clearTasks);
   document.addEventListener('change', () => { renderDownloadGuard();window.setTimeout(configureShopeeDefaults, 0); });
+  window.setInterval(configureShopeeDefaults, 250);
   window.setInterval(() => {
     const task=activeTask;
     if (task && !task.merging && !task.combinedUrl) {
@@ -599,6 +602,5 @@
       if (visibleErrors.some(node=>!task.previousDownloadErrors.has(node))) failShopeeDownload(task);
       else task.previousDownloadErrors=new Set(visibleErrors);
     }
-    configureShopeeDefaults();
-  }, 250);
+  }, 1000);
 })();

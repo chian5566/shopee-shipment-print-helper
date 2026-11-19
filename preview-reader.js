@@ -6,7 +6,7 @@
   }));
   async function readPreview() {
     if (busy || finished) return;
-    if (Date.now()-startedAt>90000) {window.clearInterval(timer);return;}
+    if (Date.now()-startedAt>180000) {window.clearInterval(timer);return;}
     const frame=document.querySelector('iframe[type="application/pdf"]');
     const failed=globalThis.LHShopeeDownloadError?.visibleTitles(document).length;
     if (!failed && !frame?.src) return;
@@ -33,6 +33,6 @@
     } catch (error) { if (!readPreview.failed) {console.warn('LH preview: '+error.message);readPreview.failed=true;} }
     finally {busy=false;}
   }
-  const timer=window.setInterval(readPreview,250);
+  const timer=window.setInterval(readPreview,1000);
   readPreview();
 })();

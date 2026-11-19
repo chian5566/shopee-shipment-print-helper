@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       const orderIds=(message.sevenEleven || message.familyMart) ? message.orderIds : [];
       if((message.sevenEleven || message.familyMart) && (!Array.isArray(orderIds) || !orderIds.length || orderIds.length>100 || new Set(orderIds).size!==orderIds.length || orderIds.some(id=>typeof id!=='string' || !/^\d{6}[A-Z0-9]{6,20}$/i.test(id)))){sendResponse({ok:false});return;}
       stopTask(tasks.get(sourceId));
-      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),familyMart:Boolean(message.familyMart),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
+      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+180000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),familyMart:Boolean(message.familyMart),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
       sendResponse({ok:true});return;
     }
     const task=tasks.get(sourceId);

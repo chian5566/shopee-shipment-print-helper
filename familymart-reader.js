@@ -5,7 +5,7 @@
   const send=message=>new Promise(resolve=>chrome.runtime.sendMessage(message,response=>{if(chrome.runtime.lastError)resolve(null);else resolve(response);}));
   async function readLabels(){
     if(busy || finished)return;
-    if(Date.now()-started>90000){window.clearInterval(timer);return;}
+    if(Date.now()-started>180000){window.clearInterval(timer);return;}
     const images=[...document.querySelectorAll('#form1 img')];
     if(!images.length || images.length>25 || images.some(i=>!i.complete || !i.naturalWidth))return;
     busy=true;
