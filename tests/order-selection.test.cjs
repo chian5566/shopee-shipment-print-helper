@@ -11,4 +11,8 @@ selection=true;for(let i=0;i<12;i++)context.renderOrders();assert.equal(selectio
 orders[0].summary=orders[0].summary.replace('TW000000000000','TWDEMO000001');context.renderOrders();assert.equal(selection,true);assert.equal(writes,1);
 orders[0].summary=orders[0].summary.replace('18:30:00','18:31:00');context.renderOrders();assert.equal(writes,2);assert.match(html,/18:31:00/);assert.equal(countWrites,1);
 orders=[];context.renderOrders();assert.equal(writes,3);assert.equal(countText,'已選 0 個訂單');context.renderOrders();assert.equal(writes,3);
+orders=Array.from({length:5},(_,index)=>({orderId:'250101TEST000'+(index+1)}));
+const numberBadges=()=>Array.from(html.matchAll(/class="lh-order-number"[^>]*>(\d+)<\/span>/g),match=>Number(match[1]));
+context.renderOrders();assert.deepEqual(numberBadges(),[1,2,3,4,5]);
+orders.splice(1,1);context.renderOrders();assert.deepEqual(numberBadges(),[1,2,3,4]);assert.doesNotMatch(html,/250101TEST0002/);
 console.log('PASS: unchanged polling preserves text selection and nodes, escaped names do not cause rerender, hidden tracking changes preserved, actual updates and empty selection still refresh');
