@@ -1,7 +1,9 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 let handler,updated,removedHandler;const forwarded=[],removed=[],created=[];let tabSeq=100;
+let now=Date.now();
+class TestDate extends Date { static now(){return now;} }
 const chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(fn){handler=fn;}}},tabs:{create:(opts,callback)=>{created.push(opts);callback({id:++tabSeq});},onUpdated:{addListener(fn){updated=fn;}},onRemoved:{addListener(fn){removedHandler=fn;}},sendMessage:(id,msg,callback)=>{forwarded.push({id,msg});callback?.({ok:true});},remove:(id,cb)=>{removed.push(id);cb?.();}}};
-vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../service-worker.js'),'utf8'),{chrome,Date,Set,Map,URL});
+vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../service-worker.js'),'utf8'),{chrome,Date:TestDate,Set,Map,URL});
 const source='https://seller.shopee.tw/portal/sale/mass/ship',preview=id=>'https://seller.shopee.tw/awbprint?job_id='+id;
 const send=(msg,id,url=source)=>{let reply;handler(msg,{tab:{id,url,windowId:1}},r=>reply=r);return reply;};
 const start=(id,taskId,jobIds)=>{assert.equal(send({type:'START_DOCUMENT_TASK',taskId},id).ok,true);send({type:'REGISTER_DOCUMENT_JOBS',taskId,jobIds},id);};
@@ -21,7 +23,20 @@ assert.equal(send({type:'OPEN_BACKGROUND_PREVIEW',taskId:'task1',url:'https://ex
 // Preview can arrive before job registration, but no tab opens until authorized ID arrives.
 assert.equal(send({type:'OPEN_BACKGROUND_PREVIEW',taskId:'task1',url:preview('later')},7).ok,true);assert.equal(created.length,1);
 send({type:'REGISTER_DOCUMENT_JOBS',taskId:'task1',jobIds:['later']},7);assert.equal(created.length,2);
+const failure={type:'PREVIEW_DOWNLOAD_FAILED',taskId:'task1'};
+assert.equal(send(failure,13,preview('b')).ok,false);
+assert.equal(send(failure,101,source).ok,false);
+assert.equal(send(failure,101,preview('a')).ok,false); // This URL already delivered its PDF.
+assert.equal(send(failure,102,preview('later')).ok,true);
+assert.equal(forwarded.at(-1).id,7);
+assert.equal(forwarded.at(-1).msg.type,'SHOPEE_DOWNLOAD_FAILED');
+assert.equal(forwarded.at(-1).msg.taskId,'task1');
 send({type:'STOP_DOCUMENT_TASK',taskId:'task1'},7);assert.ok(removed.includes(101)&&removed.includes(102));assert.equal(send({type:'GET_PREVIEW_TASK'},12,preview('a')).ok,false);assert.equal(send({type:'GET_PREVIEW_TASK'},13,preview('b')).taskId,'task2');
 removedHandler(8);assert.equal(send({type:'GET_PREVIEW_TASK'},13,preview('b')).ok,false);
 assert.equal(send({type:'START_DOCUMENT_TASK',taskId:'evil'},20,'https://example.com').ok,false);
+start(9,'slow-task',['slow']);
+now+=179999;
+assert.equal(send({type:'GET_PREVIEW_TASK'},15,preview('slow')).taskId,'slow-task');
+now+=2;
+assert.equal(send({type:'GET_PREVIEW_TASK'},15,preview('slow')).ok,false);
 console.log('PASS: independent tabs, task IDs, job validation, deferred/duplicate background opens, cancelled previews closed, stale/unrelated PDFs rejected');
