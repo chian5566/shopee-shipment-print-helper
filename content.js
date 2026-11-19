@@ -2,7 +2,7 @@
   if (window.__lhShipmentAssistantLoaded) return;
   window.__lhShipmentAssistantLoaded = true;
   const PANEL_ID = 'lh-shipment-panel';
-  const VERSION = '0.11.14';
+  const VERSION = '0.11.15';
   const REPORT_URL = 'https://forms.gle/TaJMxYJGf8wVDF7T8';
   let errorDialog;
   let panel;
@@ -79,11 +79,11 @@
     const count=panel.querySelector('.lh-count');
     const countText=`已選 ${orders.length} 個訂單`;
     if (count.textContent!==countText) count.textContent=countText;
-    const markup = orders.length ? orders.map((order) => {
+    const markup = orders.length ? orders.map((order, index) => {
       const summary=order.summary || '';
       const buyer=summary.split(' ')[0] || '—';
       const time=summary.match(/(?:20\d{2}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2})\s+\d{1,2}:\d{2}(?::\d{2})?/g)?.at(-1) || '—';
-      return `<div class="lh-order"><div class="lh-order-id"><span>訂單編號</span><strong>${escapeHtml(order.orderId)}</strong></div><dl class="lh-order-meta"><dt>買家</dt><dd>${escapeHtml(buyer)}</dd><dt>時間</dt><dd>${escapeHtml(time)}</dd></dl></div>`;
+      return `<div class="lh-order"><div class="lh-order-header"><div class="lh-order-id"><span>訂單編號</span><strong>${escapeHtml(order.orderId)}</strong></div><span class="lh-order-number" aria-label="第 ${index+1} 筆">${index+1}</span></div><dl class="lh-order-meta"><dt>買家</dt><dd>${escapeHtml(buyer)}</dd><dt>時間</dt><dd>${escapeHtml(time)}</dd></dl></div>`;
     }).join('') :
       '<div class="lh-order lh-muted">尚未選取訂單</div>';
     // Preserve the actual DOM nodes and text selection on unchanged poll ticks.
