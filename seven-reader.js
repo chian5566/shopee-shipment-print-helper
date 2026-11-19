@@ -5,7 +5,7 @@
   const send=message=>new Promise(resolve=>chrome.runtime.sendMessage(message,response=>{if(chrome.runtime.lastError)resolve(null);else resolve(response);}));
   async function readLabels(){
     if(busy || finished)return;
-    if(Date.now()-started>90000){window.clearInterval(timer);return;}
+    if(Date.now()-started>180000){window.clearInterval(timer);return;}
     const frames=[...document.querySelectorAll('.div_frame')];
     if(!frames.length)return;
     const orderIds=frames.map(frame=>frame.querySelector('[id$="lblOrderNo"]')?.textContent?.trim());

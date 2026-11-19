@@ -65,7 +65,7 @@ chrome.action.onClicked.addListener(async tab=>{
       // Recover old tabs without showing an extra menu or refreshing Shopee.
       await chrome.scripting.executeScript({target:{tabId:tab.id},world:'MAIN',files:['network-hook.js']});
       await chrome.scripting.insertCSS({target:{tabId:tab.id},files:['panel.css']});
-      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','vendor/pdf.classic.min.js','vendor/pdf.worker.classic.min.js','print-layout.js','packing-slip.js','seven-eleven.js','familymart.js','content.js','print-guide.js']});
+      await chrome.scripting.executeScript({target:{tabId:tab.id},files:['vendor/fontkit.umd.min.js','vendor/pdf-lib.min.js','vendor/pdf.classic.min.js','vendor/pdf.worker.classic.min.js','print-layout.js','packing-slip.js','seven-eleven.js','familymart.js','shopee-download-error.js','content.js','print-guide.js']});
       await chrome.tabs.sendMessage(tab.id,{type:'TOGGLE_PANEL'});
     } catch (_) {
       chrome.tabs.create({url:DOWNLOAD_PAGE_URL,active:true});
@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       const orderIds=(message.sevenEleven || message.familyMart) ? message.orderIds : [];
       if((message.sevenEleven || message.familyMart) && (!Array.isArray(orderIds) || !orderIds.length || orderIds.length>100 || new Set(orderIds).size!==orderIds.length || orderIds.some(id=>typeof id!=='string' || !/^\d{6}[A-Z0-9]{6,20}$/i.test(id)))){sendResponse({ok:false});return;}
       stopTask(tasks.get(sourceId));
-      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+90000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),familyMart:Boolean(message.familyMart),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
+      tasks.set(sourceId,{taskId:message.taskId,sourceTabId:sourceId,until:Date.now()+180000,previews:new Map(),delivered:new Set(),jobIds:new Set(),backgroundTabs:new Set(),openedUrls:new Set(),pendingUrls:new Map(),sevenEleven:Boolean(message.sevenEleven),familyMart:Boolean(message.familyMart),orderIds,sevenPreviews:new Set(),sevenDelivered:false,openedSevenUrls:new Set(),restoredSevenTabs:new Set(),restoringSevenTabs:new Set()});
       sendResponse({ok:true});return;
     }
     const task=tasks.get(sourceId);
@@ -155,11 +155,20 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
     openPreview(task,url,sender.tab.windowId,sendResponse);
     return true;
   }
-  if(message.type==='GET_PREVIEW_TASK' || message.type==='PREVIEW_PDF_READY') {
+  if(message.type==='GET_PREVIEW_TASK' || message.type==='PREVIEW_PDF_READY' || message.type==='PREVIEW_DOWNLOAD_FAILED') {
     const task=currentTask(sender),url=task?.previews.get(sender.tab?.id);
     if(!task || !url){sendResponse({ok:false});return;}
     if(message.type==='GET_PREVIEW_TASK'){sendResponse({ok:true,taskId:task.taskId});return;}
-    if(message.taskId!==task.taskId || task.delivered.has(url) || typeof message.base64!=='string' || message.base64.length>28*1024*1024){sendResponse({ok:false});return;}
+    if(message.taskId!==task.taskId || task.delivered.has(url)){sendResponse({ok:false});return;}
+    if(message.type==='PREVIEW_DOWNLOAD_FAILED'){
+      const preview=previewUrl(sender.url || sender.tab?.url);
+      if(!preview || preview.href!==url){sendResponse({ok:false});return;}
+      chrome.tabs.sendMessage(task.sourceTabId,{type:'SHOPEE_DOWNLOAD_FAILED',taskId:task.taskId},response=>{
+        sendResponse({ok:!chrome.runtime.lastError && Boolean(response?.ok)});
+      });
+      return true;
+    }
+    if(typeof message.base64!=='string' || message.base64.length>28*1024*1024){sendResponse({ok:false});return;}
     chrome.tabs.sendMessage(task.sourceTabId,{type:'PREVIEW_PDF',taskId:task.taskId,url,base64:message.base64},response=>{
       if(chrome.runtime.lastError || !response?.ok){sendResponse({ok:false});return;}
       task.delivered.add(url);task.backgroundTabs.delete(sender.tab.id);
